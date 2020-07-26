@@ -1,0 +1,558 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+  <head>
+  <meta charset="utf-8">
+  <meta name="author" content="zchengsite, 1451426471@qq.com" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  
+  
+  <title>面试官：讲讲Redis主从复制？ | coder的特殊身份</title>
+
+  
+    <link rel="apple-touch-icon" href="/images/favicon.png">
+    <link rel="icon" href="/images/favicon.png">
+  
+
+  <!-- Raleway-Font -->
+  <link href="https://fonts.googleapis.com/css?family=Raleway&display=swap" rel="stylesheet">
+
+  <!-- hexo site css -->
+  
+<link rel="stylesheet" href="/css/base.css">
+<link rel="stylesheet" href="/iconfont/iconfont.css">
+<link rel="stylesheet" href="/css/github-markdown.css">
+<link rel="stylesheet" href="/css/highlight.css">
+
+
+  <!-- jquery3.3.1 -->
+  <script src="https://cdn.bootcss.com/jquery/3.3.1/jquery.min.js"></script>
+
+  <!-- fancybox -->
+  <link href="https://cdn.bootcss.com/fancybox/3.5.2/jquery.fancybox.min.css" rel="stylesheet">
+  <script async src="https://cdn.bootcss.com/fancybox/3.5.2/jquery.fancybox.min.js"></script>
+  
+<script src="/js/fancybox.js"></script>
+
+
+  
+
+<meta name="generator" content="Hexo 4.2.1"></head>
+
+
+  <body>
+    <div id="app">
+      <div class="header">
+  <div class="avatar">
+    <a href="/"><img src="/images/avatar.png" alt=""></a>
+    <div class="nickname"><a href="/"></a></div>
+  </div>
+  <div class="navbar">
+    <ul>
+      
+        <li class="nav-item" data-path="/">
+          <a href="/">主页</a>
+        </li>
+      
+        <li class="nav-item" data-path="/archives/">
+          <a href="/archives/">归档</a>
+        </li>
+      
+        <li class="nav-item" data-path="/categories/">
+          <a href="/categories/">分类</a>
+        </li>
+      
+        <li class="nav-item" data-path="/tags/">
+          <a href="/tags/">标签</a>
+        </li>
+      
+        <li class="nav-item" data-path="/about/">
+          <a href="/about/">关于</a>
+        </li>
+      
+    </ul>
+  </div>
+</div>
+
+
+<script src="/js/activeNav.js"></script>
+
+
+
+      <div class="flex-container">
+        <!-- 文章详情页，展示文章具体内容，url形式：https://yoursite/文章标题/ -->
+<!-- 同时为「标签tag」，「朋友friend」，「分类categories」，「关于about」页面的承载页面，具体展示取决于page.type -->
+
+
+  
+  
+  
+  
+  
+  
+  
+  
+  <!-- 文章内容页 url形式：https://yoursite/文章标题/ -->
+  <div class="container post-details" id="post-details">
+    <div class="post-content">
+      <div class="post-title">面试官：讲讲Redis主从复制？</div>
+      <div class="post-attach">
+        <span class="post-pubtime">2020-07-23</span>
+        
+              <span class="post-tags">
+                <i class="iconfont icon-tags" title="标签 | tags"></i>
+                
+                <span class="span--tag">
+                  <a href="/tags/%E9%9D%A2%E8%AF%95/" title="查看 面试 标签">
+                    <b>#</b> 面试
+                  </a>
+                </span>
+                
+              </span>
+          
+      </div>
+      <div class="markdown-body">
+        <p>​                                                                    <img src="http://qd2x6jysb.bkt.clouddn.com/image-20200708032855726.png" alt="image-20200708032855726">        </p>
+<p><strong>主从复制</strong>，是指将一台 Redis 服务器的数据，复制到其他的 Redis 服务器。</p>
+<p>前者称为 <strong>主节点(master)</strong>，后者称为 <strong>从节点(slave)</strong>。且数据的复制是 <strong>单向</strong>（主节点 =&gt; 从节点） 的，只能由<strong>主节点到从节点</strong>。</p>
+<p>Redis 主从复制支持 <strong>主从同步</strong> 和 <strong>从从同步</strong> 两种，后者是 Redis 后续版本新增的功能，以减轻主节点的同步负担。（仅能从节点发起：<code>slaveof 127.0.0.1 8080</code>）</p>
+<h2 id="作用"><a href="#作用" class="headerlink" title="作用"></a>作用</h2><ul>
+<li><strong>数据冗余：</strong> 主从复制实现了数据的热备份，是持久化之外的一种数据冗余方式。</li>
+<li><strong>故障恢复：</strong> 当主节点出现问题时，可以由从节点提供服务，实现快速的故障恢复 <em>(实际上是一种服务的冗余)</em>。</li>
+<li><strong>负载均衡：</strong> 在主从复制的基础上，配合读写分离，可以由主节点提供写服务，由从节点提供读服务 <em>（即写 Redis 数据时应用连接主节点，读 Redis 数据时应用连接从节点）</em>，分担服务器负载。尤其是在写少读多的场景下，通过多个从节点分担读负载，可以大大提高 Redis 服务器的并发量。</li>
+<li><strong>高可用基石：</strong> 除了上述作用以外，主从复制还是哨兵和集群能够实施的 <strong>基础</strong>，因此说主从复制是 Redis 高可用的基础。</li>
+</ul>
+<h2 id="原理"><a href="#原理" class="headerlink" title="原理"></a>原理</h2><p><img src="http://qd2x6jysb.bkt.clouddn.com/image-20200708032635442.png" alt="image-20200708032635442"></p>
+<p><strong>三个阶段：准备阶段 =&gt; 数据同步阶段 =&gt; 命令传播阶段</strong>。</p>
+<p><img src="http://qd2x6jysb.bkt.clouddn.com/image-20200709155424603.png" alt="image-20200709155424603"></p>
+<ul>
+<li><p><strong>建立套接字连接</strong></p>
+<p>从服务器根据设置的套接字创建连向主服务器的套接字连接，主服务器接收从服务器的套接字连接之后，为该套接字创建响应的客户端状态，并将此时的从服务器看做是主服务器的客户端，也就是该从服务器同时具备服务器与客户端两个身份。</p>
+</li>
+<li><p><strong>发送PING命令</strong></p>
+<p><code>PING</code>命令主要有两种作用：</p>
+<ul>
+<li>虽然建立了套接字连接，但是还未使用过，通过发送PING命令检查套接字的读写状态是否正常；</li>
+<li>通过发送<code>PING命令</code>检查主服务器能否正常处理命令请求，能处理主服务器回复<code>PONG</code>。</li>
+</ul>
+</li>
+<li><p><strong>身份验证</strong></p>
+<p>从服务器接收到主服务器返回的“<code>PONG</code>”回复，接下来就需要考虑身份验证的事。如果从服务器设置了<code>masterauth</code>选项，那么进行身份验证，如果从服务器没有设置<code>masterauth</code>选项，那么不进行身份验证。</p>
+</li>
+<li><p><strong>发送端口信息</strong></p>
+<p>在身份验证步骤之后，从服务器将执行命令<code>REPLCONF listening-port &lt;port&gt;</code>，向主服务器发送从服务器的监听端口号。</p>
+</li>
+<li><p><strong>同步</strong></p>
+<p>从服务器向主服务器发送<code>SYNC命令</code>、<code>PSYNC命令</code>，执行同步操作。</p>
+</li>
+<li><p><strong>命令传播</strong></p>
+<p>主从服务器就会进入命令传播阶段，主服务器只要将自己执行的写命令发送给从服务器，而从服务器只要一直执行并接收主服务器发来的写命令。</p>
+<ul>
+<li><p><strong>心跳检测</strong></p>
+<p>在命令传播阶段，从服务器默认会以<strong>每秒一次的频率</strong>，向主服务器发送命令：<strong><code>REPLCONF ACK &lt;replication_offset&gt;</code></strong>。其中<code>replication_offset</code>是从服务器当前的复制偏移量。</p>
+<p>发送<code>REPLCONF ACK</code>命令对于主从服务器有三个作用：</p>
+<ul>
+<li><p><strong>检测主从服务器的网络连接状态；</strong></p>
+<p>1）如果主服务器<code>超过一秒钟</code>没有收到从服务器发来的<code>REPLCONF ACK命令</code>，那么主服务器就知道主从服务器之间的连接出现问题了。</p>
+<p>2）通过向主服务器发送<strong><code>INFO replication命令</code></strong>，在列出的从服务器列表的lag一栏中，我们可以看到相应从服务器最后一次向主服务器发送<code>REPLCONF ACK命令</code>距离现在过了多少秒。</p>
+</li>
+<li><p><strong>辅助实现<code>min-slaves</code>选项；</strong></p>
+<figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">min-slaves-to-write 3</span><br><span class="line">min-slaves-max-lag 10</span><br></pre></td></tr></table></figure>
+
+<p>   可以<strong>防止主服务器在不安全的情况下执行写命令</strong>。</p>
+<p>   <strong>从服务器的数量少于3个，或者三个从服务器的延迟（lag）值都大于或等于10秒时</strong>，主服务器将拒绝执行写命令。</p>
+</li>
+<li><p><strong>检测命令丢失。</strong></p>
+<p>如果因为网络故障，主服务器传播给从服务器的写命令在半路丢失，那么当从服务器向主服务器发送<code>REPLCONFACK命令</code>时，主服务器将发觉<code>从服务器当前的复制偏移量</code>少于<code>自己的复制偏移量</code>，然后主服务器就会根据从服务器提交的复制偏移量，在<code>复制积压缓冲区里面找到从服务器缺少的数据</code>，并将这些数据重新发送给从服务器。</p>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+<h2 id="执行SYNC命令"><a href="#执行SYNC命令" class="headerlink" title="执行SYNC命令"></a>执行SYNC命令</h2><p><img src="http://qd2x6jysb.bkt.clouddn.com/image-20200709152643001.png" alt="image-20200709152643001"></p>
+<h3 id="执行过程"><a href="#执行过程" class="headerlink" title="执行过程"></a>执行过程</h3><ul>
+<li><strong>主服务器</strong> 需要执行 <code>BGSAVE</code> 命令来生成 RDB 文件，这个生成操作会 <strong>消耗</strong> 主服务器大量的 <strong>CPU、内存和磁盘 I/O 的资源</strong>；</li>
+<li><strong>主服务器</strong> 需要将自己生成的 RDB 文件 发送给从服务器，这个发送操作会 <strong>消耗</strong> 主服务器 <strong>大量的网络资源</strong> <em>(带宽和流量)</em>，并对主服务器响应命令请求的时间产生影响；</li>
+<li>接收到 RDB 文件的 <strong>从服务器</strong> 需要载入主服务器发来的 RDB 文件，并且在载入期间，从服务器 <strong>会因为阻塞而没办法处理命令请求</strong>；</li>
+<li>master节点每执行一个写命令就会向slave节点发送相同的写命令，slave节点接收并执行收到的写命令。<strong>（命令传播操作，slave节点初始化完成后的操作）</strong></li>
+<li>当<strong>多个从服务器尝试连接同一个主服务器</strong>的时候，就会出现以下两种情况：<ul>
+<li>一是：如果master节点保存快照还未执行，所有从服务器都会接收到相同的快照文件和相同缓冲区写命令。</li>
+<li>二是：master节点保存快照正已经执行完毕，当主服务器与较早的从服务器完成以上全部步骤之后，主服务器会跟新连接的从服务器重新执行RDB保存快照。</li>
+</ul>
+</li>
+</ul>
+<h3 id="缺陷"><a href="#缺陷" class="headerlink" title="缺陷"></a>缺陷</h3><blockquote>
+<p><a href="https://blog.csdn.net/Seky_fei/article/details/106877329" target="_blank" rel="noopener">https://blog.csdn.net/Seky_fei/article/details/106877329</a></p>
+</blockquote>
+<p>1）master服务器执行BGSAVE命令生成RDB文件，这个生成过程会大量<strong>消耗主服务器资源</strong>（CPU、内存和磁盘I/O资源）。</p>
+<p>2）master需要将生成的RDB文件发送给slave，这个发送操作会<strong>消耗主从服务器大量的网络资源</strong>（带宽与流量）。</p>
+<p>3）接收到RDB文件后，slave需要载入RDB文件，载入期间slave会因为阻塞而导致没办法处理命令请求（master不会阻塞）。</p>
+<p>4）最大的问题是<strong>重连接后回全量同步数据</strong>。如上面例子，slave在断开后，再进行重新连时，slave丢掉以前的数据，行全量同步master数据，要是断开到重连期间执行的写命令很少，这种操作就没有必要了。</p>
+<h2 id="执行PSYNC命令"><a href="#执行PSYNC命令" class="headerlink" title="执行PSYNC命令"></a>执行PSYNC命令</h2><ol>
+<li><p><strong>全量复制：</strong> 用于初次复制或其他无法进行部分复制的情况，将主节点中的所有数据都发送给从节点，是一个非常重型的操作；</p>
+</li>
+<li><p><strong>部分复制：</strong> 用于网络中断等情况后的复制，只将 ==<strong>中断期间主节点执行的写命令</strong>== 发送给从节点，与全量复制相比更加高效。<strong>需要注意</strong> 的是，如果网络中断时间过长，导致主节点没有能够完整地保存中断期间执行的写命令，则无法进行部分复制，仍使用全量复制；</p>
+<p><strong>部分复制的原理：</strong></p>
+<p>主要是靠主从节点分别维护一个 <strong>复制偏移量</strong>，有了这个偏移量之后断线重连之后一比较，之后就可以仅仅把从服务器断线之后确实的这部分数据给补回来了。</p>
+</li>
+</ol>
+<h3 id="概念"><a href="#概念" class="headerlink" title="概念"></a>概念</h3><figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">PSYNC &#123;runId&#125; &#123;offset&#125;</span><br></pre></td></tr></table></figure>
+
+<ul>
+<li><p><strong>runId</strong>：每个 Redis 节点启动都会生成唯一的 uuid，每次 Redis 重启后，runId 都会发生变化；</p>
+</li>
+<li><p><strong>offset</strong>（replication offset）：主节点和从节点都各自维护自己的主从复制偏移量 offset。</p>
+<p>当主节点有写入命令时，<code>offset=offset+命令的字节长度</code>。</p>
+<p>从节点在收到主节点发送的命令后，也会增加自己的 offset，并把自己的 offset 发送给主节点。</p>
+<p>这样，主节点同时保存自己的 offset 和从节点的 offset，通过对比 offset 来判断主从节点数据是否一致；</p>
+</li>
+<li><p><strong>复制积压缓冲区</strong>（replication backlog）：保存在主节点上的一个固定长度的FIFO队列，默认大小是 1MB；==（固定大小）==</p>
+<ul>
+<li>如果<code>offset偏移量</code>之后的数据（也即是偏移量<code>offset+1</code>开始的数据）仍然<code>存在于复制积压缓冲区</code>里面，那么主服务器将对从服务器执行部分重同步操作；</li>
+<li>相反，如果<code>offset偏移量</code>之后的数据已经<code>不存在于复制积压缓冲区</code>，那么主服务器将对从服务器执行完整重同步操作。</li>
+</ul>
+</li>
+</ul>
+<h3 id="配置"><a href="#配置" class="headerlink" title="配置"></a>配置</h3><figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">#</span><span class="bash"> 设置复制积压缓冲区大小，积压队列越大，允许主从数据库断线的时间就越长</span></span><br><span class="line">repl-backlog-size 1mb</span><br></pre></td></tr></table></figure>
+
+<p><code>复制积压缓冲区</code>本质上是一个固定长度的循环队列，默认情况下积压队列的大小为1MB，可以通过配置文件设置队列大小。</p>
+<figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">#</span><span class="bash"> <span class="comment">#没有salve连接时，多久释放一次复制积压缓冲区</span></span></span><br><span class="line">repl-backlog-ttl 3600</span><br></pre></td></tr></table></figure>
+
+<p>Redis同时也提供了当没有slave需要同步的时候，多久可以<code>释放环形队列</code>，默认一小时。</p>
+<h3 id="执行过程-1"><a href="#执行过程-1" class="headerlink" title="执行过程"></a>执行过程</h3><p><img src="http://qd2x6jysb.bkt.clouddn.com/image-20200709154901864.png" alt="image-20200709154901864"></p>
+<p><strong>与SYNC区别：salve连接时，判断是否需要全量同步，全量同步的逻辑过程和SYNC一样。</strong></p>
+<ol>
+<li><p>客户端向服务器发送<code>SLAVEOF</code>命令，即<code>salve</code>向<code>master</code>发起连接请求时，<code>slave</code>根据自己是否保存<code>Master runid</code>来判断是否是第一次连接；</p>
+</li>
+<li><p>如果是第一次同步则向<code>Master</code>发送 <code>PSYNC ? -1</code> 命令来进行<strong>完整同步</strong>；</p>
+<p>如果是重连接，会向<code>Master</code>发送<code>PSYNC runid offset</code>命令（<code>runid</code>是<code>master</code>的<code>身份ID</code>，<code>offset</code>是<code>从节点</code>同步命令的<code>全局迁移量</code>）；</p>
+</li>
+<li><p>Master接收到<code>PSYNC</code> 命令后，首先判断<code>runid是否和本机的id一致</code>，如果一致则会再次判断<code>offset偏移量</code>和<code>本机的偏移量</code>相差有没有<strong>超过复制积压缓冲区大小</strong>，如果没有那么就给Slave发送CONTINUE，此时Slave只需要等待Master传回失去连接期间丢失的命令；</p>
+</li>
+<li><p>如果<code>runid</code>和<code>本机id</code>不一致或者<code>offset</code>差距<strong>超过了复制积压缓冲区大小</strong>，那么就会返回<code>FULLRESYNC runid offset</code>，<code>Slave</code>将<code>runid</code>保存起来，并进行<code>全量同步</code>。</p>
+</li>
+</ol>
+<p>接收到PSYNC命令的主服务器会向从服务器返回以下三种回复的其中一种：</p>
+<ul>
+<li>如果主服务器返回<code>+FULLRESYNC ＜runid＞ ＜offset＞</code>回复，那么表示主服务器将与从服务器执行完整重同步操作：<ul>
+<li>其中<code>runid</code>是这个主服务器的<code>运行ID</code>，从服务器会将这个ID保存起来，在下一次发送<code>PSYNC命令</code>时使用；</li>
+<li>而<code>offset</code>则是主服务器当前的复制偏移量，从服务器会将这个值作为自己的初始化偏移量。</li>
+</ul>
+</li>
+<li>如果主服务器返回<code>+CONTINUE</code>回复，那么表示主服务器将与从服务器执行部分重同步操作，从服务器只要等着主服务器将自己缺少的那部分数据发送过来就可以了。</li>
+<li>如果主服务器返回<code>-ERR</code>回复，那么表示主服务器的版本低于Redis 2.8，它识别不了PSYNC命令，从服务器将向主服务器发送<code>SYNC命令</code>，并与主服务器执行完整同步操作。</li>
+</ul>
+<p><img src="http://qd2x6jysb.bkt.clouddn.com/image-20200709174851468.png" alt="image-20200709174851468"></p>
+<h2 id="主从存在的问题"><a href="#主从存在的问题" class="headerlink" title="主从存在的问题"></a>主从存在的问题</h2><ol>
+<li><p>一旦<strong>主节点宕机，从节点晋升为主节点</strong>，同时需要修改应用方的主节点地址，还需要命令所有从节点去复制新的主节点，整个过程需要人工干预。</p>
+</li>
+<li><p><strong>主节点的写能力受到单机的限制</strong>。</p>
+</li>
+<li><p><strong>主节点的存储能力受到单机的限制</strong>。</p>
+</li>
+<li><p><strong>原生复制的弊端</strong>在早期的版本中也会比较突出，比如：redis 复制中断后，从节点会发起 <code>psync</code>。</p>
+<p>此时如果同步不成功，则会进行全量同步，主库执行全量备份的同时，可能会造成毫秒或秒级的卡顿。</p>
+</li>
+</ol>
+<p><strong>解决方案：Sentinel（哨兵）</strong></p>
+<h2 id="Sentinel-哨兵"><a href="#Sentinel-哨兵" class="headerlink" title="Sentinel(哨兵)"></a>Sentinel(哨兵)</h2><p><img src="http://qd2x6jysb.bkt.clouddn.com/image-20200708033501008.png" alt="image-20200708033501008"></p>
+<h3 id="功能"><a href="#功能" class="headerlink" title="功能"></a>功能</h3><ul>
+<li><strong>监控（Monitoring）：</strong> 哨兵会不断地检查主节点和从节点是否运作正常。</li>
+<li><strong>自动故障转移（Automatic failover）：</strong> 当 <strong>主节点</strong> 不能正常工作时，哨兵会开始 <strong>自动故障转移操作</strong>，它会将失效主节点的其中一个 <strong>从节点升级为新的主节点</strong>，并让其他从节点改为复制新的主节点。</li>
+<li><strong>配置提供者（Configuration provider）：</strong> 客户端在初始化时，通过连接哨兵来获得当前 Redis 服务的主节点地址。</li>
+<li><strong>通知（Notification）：</strong> 哨兵可以将故障转移的结果发送给客户端。</li>
+</ul>
+<h3 id="工作原理"><a href="#工作原理" class="headerlink" title="工作原理"></a>工作原理</h3><ol>
+<li>每个 Sentinel 节点都需要定期执行以下任务：每个 Sentinel 以每秒一次的频率，向它所知的主服务器、从服务器以及其他的 Sentinel 实例发送一个 PING 命令；</li>
+<li>如果一个实例距离最后一次有效回复 PING 命令的时间超过<code>down-after-milliseconds</code>所指定的值，那么这个实例会被 Sentinel 标记为<strong>主观下线（sdown）</strong>。</li>
+<li>如果一个主服务器被标记为<strong>主观下线（sdown）</strong>，那么正在监视这个服务器的所有 Sentinel 节点，要以每秒一次的频率确认主服务器的确进入了主观下线状态，当<code>Sentinel</code>从其他<code>Sentinel</code>那里接收到足够数量（<code>quorum</code>）的已下线判断之后，<code>Sentinel</code>就会将从服务器判定为客观下线，并对主服务器执行<code>故障转移</code>操作。</li>
+<li>一般情况下，每个 Sentinel 会以每 10 秒一次的频率向它已知的所有主服务器和从服务器发送 INFO 命令，当一个主服务器被标记为<strong>客观下线（odown）</strong>时，Sentinel 向下线主服务器的所有从服务器发送 INFO 命令的频率，会从 10 秒一次改为每秒一次。</li>
+<li>当一个主服务器被判断为客观下线时，监视这个下线主服务器的各个Sentinel会进行协商，选举出一个<code>领头Sentinel</code>，并由<code>领头Sentinel</code>对下线主服务器执行<code>故障转移操作</code>。（Raft算法）</li>
+<li>当没有足够数量的 Sentinel 同意主服务器下线时，主服务器的客观下线状态就会被移除。当主服务器重新向 Sentinel 的 PING 命令返回有效回复时，主服务器的主观下线状态就会被移除。</li>
+</ol>
+<h3 id="客户端访问哨兵？"><a href="#客户端访问哨兵？" class="headerlink" title="客户端访问哨兵？"></a>客户端访问哨兵？</h3><p>（不需要显式的指定主节点的地址，就可以连接到主节点）</p>
+<ul>
+<li><strong>遍历哨兵节点，获取主节点信息：</strong> 遍历哨兵节点，通过其中一个<code>哨兵节点 + masterName</code> 获得主节点的信息；该功能是通过调用哨兵节点的 <code>sentinel get-master-addr-by-name</code> 命令实现；</li>
+<li><strong>增加对哨兵的监听：</strong> 这样当发生故障转移时，客户端便可以收到哨兵的通知，从而完成主节点的切换。具体做法是：利用 Redis 提供的 <strong>发布订阅</strong> 功能，为每一个哨兵节点开启一个单独的线程，订阅哨兵节点的 + switch-master 频道，当收到消息时，重新初始化连接池。</li>
+</ul>
+<h3 id="初始化Sentinel"><a href="#初始化Sentinel" class="headerlink" title="初始化Sentinel"></a>初始化Sentinel</h3><ol>
+<li><p>初始化Sentinel状态（初始化如下对象）；</p>
+<p><img src="http://qd2x6jysb.bkt.clouddn.com/image-20200709180519642.png" alt="image-20200709180519642"></p>
+</li>
+<li><p>初始化Sentinel状态的masters属性；</p>
+<p>Sentinel状态中的masters字典记录了所有被Sentinel监视的主服务器的相关信息，其中：</p>
+<ul>
+<li><p>字典的键是被监视主服务器的名字。</p>
+</li>
+<li><p>而字典的值则是被监视主服务器对应的<code>sentinel.c/sentinelRedisInstance</code>结构。</p>
+<p>每个<code>sentinelRedisInstance</code>结构（后面简称“实例结构”）代表一个被Sentinel监视的Redis服务器实例（instance），这个实例可以是主服务器、从服务器，或者另外一个Sentinel。</p>
+</li>
+</ul>
+<p><img src="http://qd2x6jysb.bkt.clouddn.com/image-20200709180800213.png" alt="image-20200709180800213"></p>
+</li>
+<li><p>创建连向主服务器的异步网络连接；</p>
+<ul>
+<li>一个是==命令连接==，这个连接专门用于向主服务器发送命令，并接收命令回复。</li>
+<li>另一个是==订阅连接==，这个连接专门用于订阅主服务器的<code>__sentinel__:hello</code>频道。</li>
+</ul>
+<p><img src="http://qd2x6jysb.bkt.clouddn.com/image-20200709223540755.png" alt="image-20200709223540755"></p>
+</li>
+</ol>
+<h3 id="为什么有两个链接？"><a href="#为什么有两个链接？" class="headerlink" title="为什么有两个链接？"></a><strong>为什么有两个链接？</strong></h3><ul>
+<li>如果在信息发送时，想要<strong>接收信息的客户端不在线或者断线</strong>，那么这个客户端就会丢失这条信息。因此，为了不丢失<code>__sentinel__:hello</code>频道的任何信息，<code>Sentinel</code>必须专门用一个订阅连接来接收该频道的信息。</li>
+<li>除了订阅频道之外，<code>Sentinel</code>还必须<strong>向主服务器发送命令</strong>，以此来与主服务器进行通信，所以<code>Sentinel</code>还必须向主服务器创建命令连接。</li>
+</ul>
+<h3 id="获取主服务器信息"><a href="#获取主服务器信息" class="headerlink" title="获取主服务器信息"></a>获取主服务器信息</h3><p>Sentinel默认会以每十秒一次的频率，通过命令连接向被监视的主服务器发送INFO命令，并通过分析<code>INFO</code>命令的回复来获取主服务器的当前信息。</p>
+<p>通过分析主服务器返回的<code>INFO</code>命令回复信息，<code>Sentinel</code>可以获取以下信息：</p>
+<ul>
+<li><p>关于主服务器本身的信息，包括<code>run_id</code>域记录的服务器<code>运行ID</code>，以及<code>role</code>域记录的服务器角色；</p>
+</li>
+<li><p>关于主服务器属下所有从服务器的信息，每个从服务器都由一个”<code>slave</code>“字符串开头的行记录，每行的<code>ip=域</code>记录了从服务器的IP地址，而<code>port=域</code>则记录了从服务器的端口号。根据这些IP地址和端口号，<code>Sentinel</code>无须用户提供从服务器的地址信息，就可以自动发现从服务器。</p>
+<p>根据<code>run_id域</code>和<code>role域</code><strong>记录的信息</strong>，<code>Sentinel</code>将对主服务器的实例结构进行更新。例如，主服务器重启之后，它的<code>运行ID</code>就会和实例结构之前保存的<code>运行ID</code>不同，<code>Sentinel</code>检测到这一情况之后，就会对实例结构的<code>运行ID</code>进行更新。至于主服务器返回的<strong>从服务器信息</strong>，则会被用于更新主服务器实例结构的<code>slaves字典</code>。</p>
+</li>
+</ul>
+<p><img src="http://qd2x6jysb.bkt.clouddn.com/image-20200709224458594.png" alt="image-20200709224458594"></p>
+<h4 id="检测主观下线状态"><a href="#检测主观下线状态" class="headerlink" title="检测主观下线状态"></a>检测主观下线状态</h4><p>默认情况下，<code>Sentinel</code>会以每秒一次的频率向所有与它创建了命令连接的实例（包括主服务器、从服务器、其他<code>Sentinel</code>在内）发送<code>PING</code>命令，并通过实例返回的<code>PING</code>命令回复来判断实例是否在线。</p>
+<p>如果一个实例在<code>down-after-milliseconds</code>毫秒内，连续向<code>Sentinel</code>返回无效回复，那么<code>Sentinel</code>会修改这个实例所对应的实例结构，在<code>SentinelRedisInstance</code>结构的<code>flags</code>属性中打开<code>SRI_S_DOWN</code>标识，以此来表示这个实例已经进入<code>主观下线状态</code>。    </p>
+<p>用户设置的<code>down-after-milliseconds</code>选项的值，不仅会被<code>Sentinel</code>用来判断主服务器的主观下线状态，还会被用于判断主服务器属下的所有从服务器，以及所有同样监视这个主服务器的其他<code>Sentinel</code>的<code>主观下线状态</code>。举个例子，如果用户向<code>Sentinel</code>设置了以下配置：    </p>
+<figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">sentinel monitor master 127.0.0.1 6379 2</span><br><span class="line">sentinel down-after-milliseconds master 50000</span><br></pre></td></tr></table></figure>
+
+<p>那么<code>50000毫秒</code>不仅会成为<code>Sentinel</code>判断<code>master</code>进入主观下线的标准，还会成为<code>Sentinel</code>判断<code>master属下</code>所有从服务器，以及所有同样监视<code>master</code>的其他<code>Sentinel</code>进入主观下线的标准。</p>
+<p><strong><code>down-after-milliseconds</code>选项另一个需要注意的地方是，对于监视同一个主服务器的<code>多个Sentinel</code>来说，这些Sentinel所设置的<code>down-after-milliseconds</code>选项的值也可能不同，因此，当一个<code>Sentinel</code>将主服务器判断为主观下线时，其他<code>Sentinel</code>可能仍然会认为主服务器处于在线状态。</strong></p>
+<h4 id="检测客观下线状态"><a href="#检测客观下线状态" class="headerlink" title="检测客观下线状态"></a>检测客观下线状态</h4><p>当<code>Sentinel</code>将一个主服务器判断为主观下线之后，为了确认这个主服务器是否真的下线了，它会向同样监视这一主服务器的其他<code>Sentinel</code>进行询问，看它们是否也认为主服务器已经进入了<code>下线状态</code>（可以是主观下线或者客观下线）。</p>
+<p>当<code>Sentinel</code>从其他<code>Sentinel</code>那里接收到足够数量的已下线判断之后，<code>Sentinel</code>就会将从服务器判定为客观下线，并对主服务器执行<code>故障转移</code>操作。</p>
+<ul>
+<li><p>询问其他Sentinel是否同意主服务器已下线：</p>
+<p>发送<code>SENTINEL is-master-down-by-addr &lt;ip&gt; &lt;port&gt; &lt;current_epoch&gt; &lt;runid&gt;</code>命令；</p>
+<p><img src="http://qd2x6jysb.bkt.clouddn.com/image-20200709230707930.png" alt="image-20200709230707930"></p>
+</li>
+<li><p>接收<code>SENTINEL is-master-down-by-addr</code>命令：</p>
+<p>当一个<code>Sentinel</code>（<code>目标Sentinel</code>）接收到另一个<code>Sentinel</code>（<code>源Sentinel</code>）发来的<code>SENTINEL is-master-down-by</code>命令时，<code>目标Sentinel</code>会分析并取出命令请求中包含的各个参数，并根据其中的<code>主服务器IP</code>和<code>端口号</code>，检查主服务器是否已下线，然后向<code>源Sentinel</code>返回一条<code>包含三个参数的Multi Bulk回复</code>作为SENTINEL is-master-down-by命令的回复：</p>
+<p><img src="http://qd2x6jysb.bkt.clouddn.com/image-20200709230551121.png" alt="image-20200709230551121"></p>
+</li>
+</ul>
+<p>当认为主服务器已经进入下线状态的<code>Sentinel</code>的数量，超过<code>Sentinel</code>配置中设置的<code>quorum参数</code>的值，那么该<code>Sentinel</code>就会认为主服务器已经进入客观下线状态：<code>sentinel monitor master 127.0.0.1 6379 5</code></p>
+<p>那么包括当前<code>Sentinel</code>在内，总共要有<code>五个Sentinel</code>都认为主服务器已经下线，当前<code>Sentinel</code>才会将主服务器判断为<code>客观下线</code>。</p>
+<p>当然也存在每个Sentine的monitor配置quorum参数不一样，则会造成A认为已经下线，但是B认为还没下线。</p>
+<p>当一个主服务器被判断为客观下线时，监视这个下线主服务器的各个Sentinel会进行协商，选举出一个<code>领头Sentinel</code>，并由<code>领头Sentinel</code>对下线主服务器执行<code>故障转移操作</code>。</p>
+<h4 id="选举Sentinel-Leader"><a href="#选举Sentinel-Leader" class="headerlink" title="选举Sentinel Leader"></a>选举Sentinel Leader</h4><p>Raft算法；（这里不细讲，看前面的文章）</p>
+<blockquote>
+<h5 id="Raft算法"><a href="#Raft算法" class="headerlink" title="Raft算法"></a>Raft算法</h5><h6 id="选主"><a href="#选主" class="headerlink" title="选主"></a>选主</h6><p>三种角色：</p>
+<ul>
+<li><strong>Candidate</strong>：</li>
+<li><strong>Follower</strong>：</li>
+<li><strong>Leader</strong>：</li>
+</ul>
+<h6 id="日志复制（Log-Replicate）"><a href="#日志复制（Log-Replicate）" class="headerlink" title="日志复制（Log Replicate）"></a>日志复制（Log Replicate）</h6><h6 id="成员变更"><a href="#成员变更" class="headerlink" title="成员变更"></a>成员变更</h6></blockquote>
+<p>《Redis设计与实现》 16.8</p>
+<h5 id="Raft算法-1"><a href="#Raft算法-1" class="headerlink" title="Raft算法"></a>Raft算法</h5><h6 id="选主-1"><a href="#选主-1" class="headerlink" title="选主"></a>选主</h6><p>三种角色：</p>
+<ul>
+<li><strong>Candidate</strong>：</li>
+<li><strong>Follower</strong>：</li>
+<li><strong>Leader</strong>：</li>
+</ul>
+<h6 id="日志复制（Log-Replicate）-1"><a href="#日志复制（Log-Replicate）-1" class="headerlink" title="日志复制（Log Replicate）"></a>日志复制（Log Replicate）</h6><h6 id="成员变更-1"><a href="#成员变更-1" class="headerlink" title="成员变更"></a>成员变更</h6><h3 id="新的主服务器是怎样被挑选出来的？"><a href="#新的主服务器是怎样被挑选出来的？" class="headerlink" title="新的主服务器是怎样被挑选出来的？"></a>新的主服务器是怎样被挑选出来的？</h3><p><strong>选举</strong>：</p>
+<ul>
+<li>1）删除列表中所有<strong>处于下线或者断线状态</strong>的从服务器，这可以保证列表中剩余的从服务器都是正常在线的。（<code>状态正常</code>）</li>
+<li>2）删除列表中所有<strong>最近五秒内没有回复过领头Sentinel的INFO命令的从服务器</strong>，这可以保证列表中剩余的从服务器都是最近成功进行过通信的。（<code>通信正常</code>）</li>
+<li>3）删除所有与已下线主服务器连接断开超过<code>down-after-milliseconds*10毫秒</code>的从服务器：<code>down-after-milliseconds</code>选项指定了判断主服务器下线所需的时间，而删除断开时长超过<code>down-after-milliseconds*10毫秒</code>的从服务器，则可以保证列表中剩余的从服务器都没有过早地与主服务器断开连接，换句话说，列表中剩余的从服务器保存的数据都是比较新的。（<code>排序：优先级 -&gt; 复制偏移量offset -&gt; 运行ID runId</code>）<ul>
+<li>之后，领头Sentinel将根据<code>从服务器的优先级</code>，对列表中剩余的从服务器进行<code>排序</code>，并选出其中<code>优先级最高的从服务器</code>。</li>
+<li>如果有<strong>多个具有相同最高优先级的从服务器</strong>，那么<code>领头Sentinel</code>将按照从服务器的<code>复制偏移量（offeset）</code>，对具有相同最高优先级的所有从服务器进行排序，并选出其中<strong>偏移量最大的从服务器</strong>（复制偏移量最大的从服务器就是保存着最新数据的从服务器）。</li>
+<li>最后，如果有<strong>多个优先级最高、复制偏移量最大的从服务器</strong>，那么领头Sentinel将按照<code>运行ID（runId）</code>对这些从服务器进行排序，并选出其中<code>运行ID（runId）最小</code>的从服务器。</li>
+</ul>
+</li>
+</ul>
+<h2 id="RedisCluster"><a href="#RedisCluster" class="headerlink" title="RedisCluster"></a>RedisCluster</h2><p><img src="http://qd2x6jysb.bkt.clouddn.com/image-20200708034042256.png" alt="image-20200708034042256"></p>
+<h3 id="基本原理"><a href="#基本原理" class="headerlink" title="基本原理"></a>基本原理</h3><p><img src="http://qd2x6jysb.bkt.clouddn.com/image-20200708034116188.png" alt="image-20200708034116188"></p>
+<p>Redis 集群中内置了 <code>16384</code> 个哈希槽。当客户端连接到 Redis 集群之后，会同时得到一份关于这个 <strong>集群的配置信息</strong>，当客户端具体对某一个 <code>key</code> 值进行操作时，会计算出它的一个 Hash 值，然后把结果对 <code>16384</code> <strong>求余数</strong>，这样每个 <code>key</code> 都会对应一个编号在 <code>0-16383</code> 之间的哈希槽，Redis 会根据节点数量 <strong>大致均等</strong> 的将哈希槽映射到不同的节点。</p>
+<h3 id="内部数据结构"><a href="#内部数据结构" class="headerlink" title="内部数据结构"></a>内部数据结构</h3><p><code>ClusterNode</code>结构：</p>
+<ul>
+<li><code>clusterNode</code> 结构保存了 <strong>一个节点的当前状态</strong>，包括创建时间、节点 id、ip 和端口号等。</li>
+<li>每个节点都会用一个 <code>clusterNode</code> 结构记录自己的状态，并为集群内所有其他节点都创建一个 <code>clusterNode</code> 结构来记录节点状态。</li>
+</ul>
+<p><img src="http://qd2x6jysb.bkt.clouddn.com/image-20200709233823043.png" alt="image-20200709233823043"></p>
+<p><code>ClusterState</code>结构：</p>
+<p><code>clusterState</code> 结构保存了在当前节点视角下，集群所处的状态。包括故障转移、槽迁移等。</p>
+<p><img src="http://qd2x6jysb.bkt.clouddn.com/image-20200709233945811.png" alt="image-20200709233945811"></p>
+<p><img src="http://qd2x6jysb.bkt.clouddn.com/image-20200710012755077.png" alt="image-20200710012755077"></p>
+<p>集群中执行命令：</p>
+<p><img src="http://qd2x6jysb.bkt.clouddn.com/image-20200710012717507.png" alt="image-20200710012717507"></p>
+<p>计算属于哪个槽：<code>CRC(KEY) &amp; 16383;</code></p>
+<ul>
+<li>当节点发现键所在的槽并非由自己负责处理的时候，节点就会向客户端返回一个<code>MOVED</code>错误，指引客户端转向至正在负责槽的节点。例如：<code>MOVED 10086 127.0.0.1:7002</code> ；</li>
+<li>当客户端接收到节点返回的<code>MOVED</code>错误时，客户端会根据<code>MOVED</code>错误中提供的<code>IP地址</code>和<code>端口号</code>，转向至负责处理<code>槽slot</code>的节点，并向该节点重新发送之前想要执行的命令。</li>
+</ul>
+<p>用<code>slots_to_keys</code>保存槽和键的关系：</p>
+<p><code>slots_to_keys</code>跳跃表每个节点的分值（<code>score</code>）都是一个槽号，而每个节点的成员（<code>member</code>）都是一个数据库键：</p>
+<ul>
+<li>每当节点往数据库中添加一个新的键值对时，节点就会将这个键以及键的槽号关联到<code>slots_to_keys</code>跳跃表；</li>
+<li>当节点删除数据库中的某个键值对时，节点就会在<code>slots_to_keys</code>跳跃表解除被删除键与槽号的关联。</li>
+</ul>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">typedef</span> <span class="class"><span class="keyword">struct</span> <span class="title">clusterState</span> &#123;</span></span><br><span class="line"> 	<span class="comment">// ...</span></span><br><span class="line">  zskiplist *slots_to_keys;</span><br><span class="line">  <span class="comment">//...</span></span><br><span class="line">&#125; clusterState;</span><br></pre></td></tr></table></figure>
+
+<p><img src="http://qd2x6jysb.bkt.clouddn.com/image-20200710013155895.png" alt="image-20200710013155895"></p>
+<h3 id="重新分片"><a href="#重新分片" class="headerlink" title="重新分片"></a>重新分片</h3><p><code>Redis集群</code>的重新分片操作可以将任意数量已经指派给<code>某个节点（源节点）</code>的槽改为指派给<code>另一个节点（目标节点）</code>，并且相关槽所属的键值对也会从源节点被移动到目标节点。</p>
+<p>重新分片操作可以在线（online）进行，在重新分片的过程中，集群不需要下线，并且源节点和目标节点都可以继续处理命令请求。</p>
+<h5 id="实现原理"><a href="#实现原理" class="headerlink" title="实现原理"></a>实现原理</h5><p>由Redis集群管理软件<code>redis-trib</code>负责，Redis提供了进行重新分片所需的所有命令，而<code>redis-trib</code>则通过向源节点和目标节点发送命令来进行重新分片操作。</p>
+<p><img src="http://qd2x6jysb.bkt.clouddn.com/image-20200710013629213.png" alt="image-20200710013629213"></p>
+<img src="http://qd2x6jysb.bkt.clouddn.com/image-20200710013644451.png" alt="image-20200710013644451" style="zoom:67%;" />
+
+
+
+<h3 id="集群的故障转移"><a href="#集群的故障转移" class="headerlink" title="集群的故障转移"></a>集群的故障转移</h3><p>Redis集群中的节点分为<code>主节点（master）</code>和<code>从节点（slave）</code>，其中<strong>主节点用于处理槽</strong>，而<strong>从节点则用于复制某个主节点</strong>，并在被复制的主节点下线时，代替下线主节点继续处理命令请求。</p>
+<h4 id="故障检测"><a href="#故障检测" class="headerlink" title="故障检测"></a>故障检测</h4><p>集群中的每个节点都会<strong>定期地向集群中的其他节点发送PING消息</strong>，以此来<strong>检测对方是否在线</strong>，如果接收PING消息的节点<strong>没有在规定的时间内，向发送PING消息的节点返回PONG消息</strong>，那么<code>发送PING消息的节点</code>就会将<code>接收PING消息的节点</code>标记为<code>疑似下线（probable fail，PFAIL）</code>。</p>
+<p>集群中的各个节点会通过互相发送消息的方式来交换集群中各个节点的状态信息，例如某个节点是处于<code>在线状态</code>、<code>疑似下线状态（PFAIL）</code>，还是<code>已下线状态（FAIL）</code>。</p>
+<h4 id="故障转移"><a href="#故障转移" class="headerlink" title="故障转移"></a>故障转移</h4><p>当一个从节点发现自己正在复制的主节点进入了已下线状态时，从节点将开始对下线主节点进行故障转移，以下是故障转移的执行步骤：</p>
+<p>1）复制下线主节点的所有从节点里面，会有一个从节点被选中。</p>
+<p>2）被选中的从节点会执行<code>SLAVEOF no one</code>命令，成为新的主节点。</p>
+<p>3）新的主节点会撤销所有对已下线主节点的槽指派，并将这些槽全部指派给自己。</p>
+<p>4）新的主节点向集群<code>广播一条PONG消息</code>，这条<code>PONG消息</code>可以让集群中的其他节点立即知道<strong>这个节点已经由从节点变成了主节点</strong>，并且这个主节点已经接管了原本由已下线节点负责处理的槽。</p>
+<p>5）新的主节点开始接收和自己负责处理的槽有关的命令请求，故障转移完成。</p>
+<h4 id="选举新节点"><a href="#选举新节点" class="headerlink" title="选举新节点"></a>选举新节点</h4><p>1）集群的配置纪元是一个<code>自增计数器</code>，它的初始值为0。</p>
+<p>2）当集群里的某个节点开始一次故障转移操作时，集群<code>配置纪元的值会被增一</code>。</p>
+<p>3）对于每个配置纪元，集群里每个负责处理槽的主节点都有一次投票的机会，而第一个向主节点要求投票的从节点将获得主节点的投票。</p>
+<p>4）当从节点发现自己正在复制的主节点进入已下线状态时，从节点会向集群广播一条<code>CLUSTERMSG_TYPE_FAILOVER_AUTH_REQUEST</code>消息，要求所有收到这条消息、并且具有投票权的主节点向这个从节点投票。</p>
+<p>5）如果一个主节点具有投票权（它正在负责处理槽），并且这个主节点尚未投票给其他从节点，那么主节点将向要求投票的从节点返回一条<code>CLUSTERMSG_TYPE_FAILOVER_AUTH_ACK</code>消息，表示这个主节点支持从节点成为新的主节点。</p>
+<p>6）每个参与选举的从节点都会接收<code>CLUSTERMSG_TYPE_FAILOVER_AUTH_ACK</code>消息，并根据自己收到了多少条这种消息来统计自己获得了多少主节点的支持。</p>
+<p>7）如果集群里有N个具有投票权的主节点，那么当一个从节点收集到<code>大于等于N/2+1</code>张支持票时，这个从节点就会当选为新的主节点。</p>
+<p>8）因为在每一个配置纪元里面，每个具有投票权的主节点只能投一次票，所以如果有N个主节点进行投票，那么具有<code>大于等于N/2+1张支持票的从节点只会有一个</code>，这确保了新的主节点只会有一个。</p>
+<p>9）如果在一个配置纪元里面没有从节点能收集到足够多的支持票，那么集群进入一个新的配置纪元，并再次进行选举，直到选出新的主节点为止。</p>
+<h3 id="主要作用"><a href="#主要作用" class="headerlink" title="主要作用"></a>主要作用</h3><ul>
+<li><strong>数据分区：</strong> 数据分区 <em>(或称数据分片)</em> 是集群最核心的功能。集群将数据分散到多个节点，<strong>一方面</strong> 突破了 Redis 单机内存大小的限制，<strong>存储容量大大增加</strong>；<strong>另一方面</strong> 每个主节点都可以对外提供读服务和写服务，<strong>大大提高了集群的响应能力</strong>。Redis 单机内存大小受限问题，在介绍持久化和主从复制时都有提及，例如，如果单机内存太大，<code>bgsave</code> 和 <code>bgrewriteaof</code> 的 <code>fork</code> 操作可能导致主进程阻塞，主从环境下主机切换时可能导致从节点长时间无法提供服务，全量复制阶段主节点的复制缓冲区可能溢出……</li>
+<li><strong>高可用：</strong> 集群支持主从复制和主节点的 <strong>自动故障转移</strong> <em>（与哨兵类似）</em>，当任一节点发生故障时，集群仍然可以对外提供服务。</li>
+</ul>
+<h3 id="分区方案"><a href="#分区方案" class="headerlink" title="分区方案"></a>分区方案</h3><ol>
+<li><p><strong>方案一：哈希值 % 节点数</strong></p>
+</li>
+<li><p><strong>方案二：一致性哈希分区</strong></p>
+<p><img src="http://qd2x6jysb.bkt.clouddn.com/image-20200708034627815.png" alt="image-20200708034627815"></p>
+</li>
+<li><p><strong>方案三：带有虚拟节点的一致性哈希分区</strong></p>
+</li>
+</ol>
+
+      </div>
+      
+        <div class="prev-or-next">
+          <div class="post-foot-next">
+            
+              <a href="/2020/07/23/hello-world/" target="_self">
+                <i class="iconfont icon-chevronleft"></i>
+                <span>PREV</span>
+              </a>
+            
+          </div>
+          <div class="post-attach">
+            <span class="post-pubtime">2020-07-23</span>
+            
+                  <span class="post-tags">
+                    <i class="iconfont icon-tags" title="标签 | tags"></i>
+                    
+                    <span class="span--tag">
+                      <a href="/tags/%E9%9D%A2%E8%AF%95/" title="查看 面试 标签">
+                        <b>#</b> 面试
+                      </a>
+                    </span>
+                    
+                  </span>
+              
+          </div>
+          <div class="post-foot-prev">
+            
+          </div>
+        </div>
+      
+    </div>
+    
+  <div class="post-catalog" id="catalog">
+    <div class="title">目录</div>
+    <div class="catalog-content">
+      <ol class="toc"><li class="toc-item toc-level-2"><a class="toc-link" href="#作用"><span class="toc-text">作用</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#原理"><span class="toc-text">原理</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#执行SYNC命令"><span class="toc-text">执行SYNC命令</span></a><ol class="toc-child"><li class="toc-item toc-level-3"><a class="toc-link" href="#执行过程"><span class="toc-text">执行过程</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#缺陷"><span class="toc-text">缺陷</span></a></li></ol></li><li class="toc-item toc-level-2"><a class="toc-link" href="#执行PSYNC命令"><span class="toc-text">执行PSYNC命令</span></a><ol class="toc-child"><li class="toc-item toc-level-3"><a class="toc-link" href="#概念"><span class="toc-text">概念</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#配置"><span class="toc-text">配置</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#执行过程-1"><span class="toc-text">执行过程</span></a></li></ol></li><li class="toc-item toc-level-2"><a class="toc-link" href="#主从存在的问题"><span class="toc-text">主从存在的问题</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#Sentinel-哨兵"><span class="toc-text">Sentinel(哨兵)</span></a><ol class="toc-child"><li class="toc-item toc-level-3"><a class="toc-link" href="#功能"><span class="toc-text">功能</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#工作原理"><span class="toc-text">工作原理</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#客户端访问哨兵？"><span class="toc-text">客户端访问哨兵？</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#初始化Sentinel"><span class="toc-text">初始化Sentinel</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#为什么有两个链接？"><span class="toc-text">为什么有两个链接？</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#获取主服务器信息"><span class="toc-text">获取主服务器信息</span></a><ol class="toc-child"><li class="toc-item toc-level-4"><a class="toc-link" href="#检测主观下线状态"><span class="toc-text">检测主观下线状态</span></a></li><li class="toc-item toc-level-4"><a class="toc-link" href="#检测客观下线状态"><span class="toc-text">检测客观下线状态</span></a></li><li class="toc-item toc-level-4"><a class="toc-link" href="#选举Sentinel-Leader"><span class="toc-text">选举Sentinel Leader</span></a><ol class="toc-child"><li class="toc-item toc-level-5"><a class="toc-link" href="#Raft算法"><span class="toc-text">Raft算法</span></a><ol class="toc-child"><li class="toc-item toc-level-6"><a class="toc-link" href="#选主"><span class="toc-text">选主</span></a></li><li class="toc-item toc-level-6"><a class="toc-link" href="#日志复制（Log-Replicate）"><span class="toc-text">日志复制（Log Replicate）</span></a></li><li class="toc-item toc-level-6"><a class="toc-link" href="#成员变更"><span class="toc-text">成员变更</span></a></li></ol></li><li class="toc-item toc-level-5"><a class="toc-link" href="#Raft算法-1"><span class="toc-text">Raft算法</span></a><ol class="toc-child"><li class="toc-item toc-level-6"><a class="toc-link" href="#选主-1"><span class="toc-text">选主</span></a></li><li class="toc-item toc-level-6"><a class="toc-link" href="#日志复制（Log-Replicate）-1"><span class="toc-text">日志复制（Log Replicate）</span></a></li><li class="toc-item toc-level-6"><a class="toc-link" href="#成员变更-1"><span class="toc-text">成员变更</span></a></li></ol></li></ol></li></ol></li><li class="toc-item toc-level-3"><a class="toc-link" href="#新的主服务器是怎样被挑选出来的？"><span class="toc-text">新的主服务器是怎样被挑选出来的？</span></a></li></ol></li><li class="toc-item toc-level-2"><a class="toc-link" href="#RedisCluster"><span class="toc-text">RedisCluster</span></a><ol class="toc-child"><li class="toc-item toc-level-3"><a class="toc-link" href="#基本原理"><span class="toc-text">基本原理</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#内部数据结构"><span class="toc-text">内部数据结构</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#重新分片"><span class="toc-text">重新分片</span></a><ol class="toc-child"><li class="toc-item toc-level-5"><a class="toc-link" href="#实现原理"><span class="toc-text">实现原理</span></a></li></ol></li></ol></li><li class="toc-item toc-level-3"><a class="toc-link" href="#集群的故障转移"><span class="toc-text">集群的故障转移</span></a><ol class="toc-child"><li class="toc-item toc-level-4"><a class="toc-link" href="#故障检测"><span class="toc-text">故障检测</span></a></li><li class="toc-item toc-level-4"><a class="toc-link" href="#故障转移"><span class="toc-text">故障转移</span></a></li><li class="toc-item toc-level-4"><a class="toc-link" href="#选举新节点"><span class="toc-text">选举新节点</span></a></li></ol></li><li class="toc-item toc-level-3"><a class="toc-link" href="#主要作用"><span class="toc-text">主要作用</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#分区方案"><span class="toc-text">分区方案</span></a></li></ol></li></ol>
+    </div>
+  </div>
+
+  
+<script src="/js/catalog.js"></script>
+
+
+
+
+    
+      <div class="comments-container">
+        
+
+
+  <script src='//unpkg.com/valine/dist/Valine.min.js'></script>
+
+  <div id="vcomments"></div>
+
+  <script>
+    new Valine({
+      el: '#vcomments',
+      appId: 'bSYdbCIyQHwCwv9NC9Fes7mU-gzGzoHsz',
+      appKey: 'zuj9HNh3w0O1O5t1nR1yeNHD',
+      placeholder: '说出你的想法...',
+      avatar: 'retro'
+    })
+  </script>
+
+    <style>
+      .comments-container .v .vempty {
+        display: none!important;
+      }
+    </style>
+
+
+
+
+      </div>
+    
+  </div>
+
+  
+        <div class="footer">
+  <div class="social">
+    <ul>
+      
+        <li>
+          <a title="github" href="https://github.com/YYZ-coder" target="_blank" rel="noopener">
+            <i class="iconfont icon-github"></i>
+          </a>
+        </li>
+      
+        <li>
+          <a title="rss" href="/atom.xml">
+            <i class="iconfont icon-rss"></i>
+          </a>
+        </li>
+      
+    </ul>
+  </div>
+  
+    <div class="footer-more">
+      <a href="">Copyright © YYZ-coder 2020</a>
+    </div>
+  
+    <div class="footer-more">
+      <a href="https://github.com/zchengsite/hexo-theme-oranges" target="_blank" rel="noopener">Theme by Oranges | Powered by Hexo</a>
+    </div>
+  
+</div>
+
+      </div>
+
+      <div class="back-to-top hidden">
+  <a href="javascript: void(0)">
+    <i class="iconfont icon-chevronup"></i>
+  </a>
+</div>
+
+
+<script src="/js/backtotop.js"></script>
+
+
+
+    </div>
+  </body>
+</html>
