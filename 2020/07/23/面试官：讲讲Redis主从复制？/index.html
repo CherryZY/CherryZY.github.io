@@ -112,7 +112,10 @@
           
       </div>
       <div class="markdown-body">
-        <p>​                                                                    <img src="http://qd2x6jysb.bkt.clouddn.com/image-20200708032855726.png" alt="image-20200708032855726">        </p>
+        <blockquote>
+<p>2020-07-23，每日问题：讲讲Redis主从复制？</p>
+</blockquote>
+<p>​                                                                    <img src="http://qd2x6jysb.bkt.clouddn.com/image-20200708032855726.png" alt="image-20200708032855726">        </p>
 <p><strong>主从复制</strong>，是指将一台 Redis 服务器的数据，复制到其他的 Redis 服务器。</p>
 <p>前者称为 <strong>主节点(master)</strong>，后者称为 <strong>从节点(slave)</strong>。且数据的复制是 <strong>单向</strong>（主节点 =&gt; 从节点） 的，只能由<strong>主节点到从节点</strong>。</p>
 <p>Redis 主从复制支持 <strong>主从同步</strong> 和 <strong>从从同步</strong> 两种，后者是 Redis 后续版本新增的功能，以减轻主节点的同步负担。（仅能从节点发起：<code>slaveof 127.0.0.1 8080</code>）</p>
