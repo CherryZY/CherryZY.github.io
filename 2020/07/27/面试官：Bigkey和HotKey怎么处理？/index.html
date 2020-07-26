@@ -101,7 +101,43 @@
         
       </div>
       <div class="markdown-body">
-        
+        <h2 id="什么是bigkey？"><a href="#什么是bigkey？" class="headerlink" title="什么是bigkey？"></a><strong>什么是bigkey？</strong></h2><p>字符串类型：它的big体现在单个value值很大，一般认为<code>超过10KB就是bigkey</code>。</p>
+<p>非字符串类型：哈希、列表、集合、有序集合，它们的big体现在<code>元素个数太多</code>。</p>
+<h3 id="如何发现？"><a href="#如何发现？" class="headerlink" title="如何发现？"></a><strong>如何发现？</strong></h3><figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">redis-cli --bigkeys</span><br></pre></td></tr></table></figure>
+
+<p>要查询Redis里大于5000的所有key：</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">debug object $&#123;key&#125;命令</span><br></pre></td></tr></table></figure>
+
+<ol>
+<li>建议在从节点执行，因为<code>--bigkeys</code>也是通过<code>scan</code>完成的。</li>
+<li>建议在节点本机执行，这样可以减少网络开销。</li>
+<li>如果没有从节点，可以使用<code>--i</code>参数，例如(<code>--i 0.1</code>代表100毫秒执行一次)；</li>
+<li><code>--bigkeys</code>只能计算每种数据结构的top1，如果有些数据结构非常多<code>的bigkey</code>，也搞不定。</li>
+</ol>
+<h3 id="危害？"><a href="#危害？" class="headerlink" title="危害？"></a>危害？</h3><ul>
+<li><strong>内存空间不均匀</strong>：这样会不利于集群对内存的统一管理，存在丢失数据的隐患；</li>
+<li><strong>超时阻塞</strong>：由于Redis单线程的特性，操作bigkey的通常比较耗时，也就意味着阻塞Redis可能性越大，这样会造成客户端阻塞或者引起故障切换，它们通常出现在慢查询中；</li>
+<li><strong>网络拥塞</strong>：<code>bigkey</code>也就意味着每次获取要产生的网络流量较大，假设一个<code>bigkey</code>为<code>1MB</code>，客户端每秒访问量为1000，那么每秒产生1000MB的流量，对于普通的千兆网卡（按照字节算是128MB/s）的服务器来说简直是灭顶之灾，而且一般服务器会采用单机多实例的方式来部署，也就是说一个bigkey可能会对其他实例造成影响；</li>
+<li><strong>迁移困难</strong>：当需要对bigkey进行迁移（例如Redis cluster的迁移slot），实际上是通过<code>migrate命令</code>来完成的，<code>migrate</code>实际上是通过<code>dump + restore + del</code>三个命令组合成原子命令完成，如果是<code>bigkey</code>，可能会使迁移失败，而且<code>较慢的migrate会阻塞Redis</code>。</li>
+</ul>
+<p><strong>注：</strong></p>
+<ul>
+<li><code>string类型</code>控制在<code>10KB</code>以内，<code>hash</code>、<code>list</code>、<code>set</code>、<code>zset</code>元素个数不要超过<code>5000</code>。</li>
+<li>非字符串的<code>bigkey</code>，不要使用<code>del</code>删除，使用<code>hscan</code>、<code>sscan</code>、<code>zscan</code>方式渐进式删除；<br>同时要注意防止<code>bigkey</code>过期时间自动删除问题（例如一个200万的<code>zset</code>设置1小时过期，会触发del操作，造成阻塞，而且该操作不会出现在慢查询中（<code>latency</code>可查））</li>
+</ul>
+<h2 id="HotKey"><a href="#HotKey" class="headerlink" title="HotKey"></a>HotKey</h2><h3 id="目标？"><a href="#目标？" class="headerlink" title="目标？"></a>目标？</h3><ul>
+<li>减少重缓存次数</li>
+<li>数据尽可能一致</li>
+<li>减少潜在危险</li>
+</ul>
+<h3 id="解决方式？"><a href="#解决方式？" class="headerlink" title="解决方式？"></a>解决方式？</h3><ul>
+<li><p>互斥锁</p>
+</li>
+<li><p>永远不过期</p>
+</li>
+</ul>
+<p><img src="http://qd2x6jysb.bkt.clouddn.com/image-20200711110521475.png" alt="image-20200711110521475"></p>
+
       </div>
       
         <div class="prev-or-next">
@@ -124,6 +160,18 @@
       
     </div>
     
+  <div class="post-catalog" id="catalog">
+    <div class="title">目录</div>
+    <div class="catalog-content">
+      <ol class="toc"><li class="toc-item toc-level-2"><a class="toc-link" href="#什么是bigkey？"><span class="toc-text">什么是bigkey？</span></a><ol class="toc-child"><li class="toc-item toc-level-3"><a class="toc-link" href="#如何发现？"><span class="toc-text">如何发现？</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#危害？"><span class="toc-text">危害？</span></a></li></ol></li><li class="toc-item toc-level-2"><a class="toc-link" href="#HotKey"><span class="toc-text">HotKey</span></a><ol class="toc-child"><li class="toc-item toc-level-3"><a class="toc-link" href="#目标？"><span class="toc-text">目标？</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#解决方式？"><span class="toc-text">解决方式？</span></a></li></ol></li></ol>
+    </div>
+  </div>
+
+  
+<script src="/js/catalog.js"></script>
+
+
+
 
     
       <div class="comments-container">
