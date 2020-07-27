@@ -125,19 +125,123 @@
       </div>
       <div class="markdown-body">
         <p>开头先提一下，什么是<code>TIME_WAIT</code>呢？</p>
-<p><code>TIME_WAIT</code>就是TCP断开连接时四次挥手中的一个状态。（下面详谈）</p>
+<p><code>TIME_WAIT</code>就是TCP断开连接时四次挥手中发起端的一个连接状态。（下面详谈）</p>
+<p>科普两个<code>linux</code>命令先：</p>
+<figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">#</span><span class="bash"> 查看服务器上各个状态的统计数量</span></span><br><span class="line">netstat -ant | awk '/^tcp/ &#123;++y[$NF]&#125; END &#123;for(w in y) print w, y[w]&#125;'</span><br><span class="line"></span><br><span class="line"><span class="meta">#</span><span class="bash"> 单独看TIME_WAIT</span></span><br><span class="line">ss -nat | grep TIME-WAIT</span><br></pre></td></tr></table></figure>
+
+
+
 <h2 id="四次挥手"><a href="#四次挥手" class="headerlink" title="四次挥手"></a>四次挥手</h2><p><img src="http://qd2x6jysb.bkt.clouddn.com/image-20200711202729020.png" alt="image-20200711202729020"></p>
 <p>客户端发起终止连接（<code>FIN</code>），但是由于TCP是全双工的，所以还需要服务端向客户端也发送<code>FIN</code>发起终止当前连接。</p>
 <p>坦白来说：</p>
 <p>当一方完成数据发送任务后，发送一个<code>FIN</code>来终止这一方向的连接，收到一个<code>FIN</code>只是意味着这一方向上没有数据流动了，即不会再收到数据了，但是在这个<code>TCP</code>连接上仍然能够发送数据，直到这一方向也发送了<code>FIN</code>。</p>
 <p>首先进行关闭的一方将执行主动关闭，而另一方则执行被动关闭。</p>
+<p><strong>流程如下：</strong></p>
+<ul>
+<li>客户端打算关闭连接，此时会发送一个 TCP 首部 <code>FIN</code> 标志位被置为 <code>1</code> 的报文，也即 <code>FIN</code> 报文，之后客户端进入 <code>FIN_WAIT_1</code> 状态。</li>
+<li>服务端收到该报文后，就向客户端发送 <code>ACK</code> 应答报文，接着服务端进入 <code>CLOSED_WAIT</code> 状态。</li>
+<li>客户端收到服务端的 <code>ACK</code> 应答报文后，之后进入 <code>FIN_WAIT_2</code> 状态。</li>
+<li>等待服务端处理完数据后，也向客户端发送 <code>FIN</code> 报文，之后服务端进入 <code>LAST_ACK</code> 状态。</li>
+<li>客户端收到服务端的 <code>FIN</code> 报文后，回一个 <code>ACK</code> 应答报文，之后进入 <code>TIME_WAIT</code> 状态</li>
+<li>服务器收到了 <code>ACK</code> 应答报文后，就进入了 <code>CLOSE</code> 状态，至此服务端已经完成连接的关闭。</li>
+<li>客户端在经过 <code>2MSL</code> 一段时间后，自动进入 <code>CLOSE</code> 状态，至此客户端也完成连接的关闭。</li>
+</ul>
+<p>好了，大致流程如上，接下来看问题：</p>
+<h3 id="为什么要四次挥手"><a href="#为什么要四次挥手" class="headerlink" title="为什么要四次挥手?"></a><strong>为什么要四次挥手?</strong></h3><p>TCP协议是一种面向连接的、可靠的、基于字节流的运输层通信协议。</p>
+<p>TCP是<strong>全双工模式</strong>，这就意味着，当<code>主机1</code>发出<code>FIN报文段</code>时，只是表示<code>主机1</code>已经没有数据要发送了，<code>主机1</code>告诉<code>主机2</code>， 它的数据已经全部发送完毕了；</p>
+<p>但是这个时候<code>主机1</code>还是可以接受来自<code>主机2</code>的数据；当<code>主机2</code>返回ACK报文段时，表示它已经知道<code>主机1</code>没有数据发送了，但是<code>主机2</code>还是可以发送数据到<code>主机1</code>的;</p>
+<p>当<code>主机2</code>也发送了FIN 报文段时，这个时候就表示<code>主机2</code>也没有数据要发送了，就会告诉<code>主机1</code>，我也没有数据要发送了，之后彼此就会愉快的中断这次TCP连接。</p>
+<p>如果要正确的理解四次分手的原理，就需要了解四次分手过程中的状态变化：</p>
+<p><strong>FIN_WAIT_1:</strong>  </p>
+<p>这个状态要好好解释一下，其实<code>FIN_WAIT_1</code>和<code>FIN_WAIT_2</code>状态的真正含义都是表示等待对方的FIN报文。而这两种状态的区别是：</p>
+<ul>
+<li><code>FIN_WAIT_1</code>状态实际上是当<code>SOCKET</code>在<code>ESTABLISHED</code>状态时， 它想主动关闭连接，向对方发送了<code>FIN报文</code>，此时该<code>SOCKET</code>即进入到<code>FIN_WAIT_1</code>状态。</li>
+<li>当对方回应<code>ACK报文</code>后，则进入到<code>FIN_WAIT_2</code>状态，当然在实际的正常情况下，无论对方何种情况下，都应该马上回应<code>ACK报文</code>，所以<code>FIN_WAIT_1</code>状态一般是比较难见到的，而<code>FIN_WAIT_2</code>状态还有时常常可以用<code>netstat</code>看到。 <strong>（主动方）</strong></li>
+</ul>
+<p><strong>FIN_WAIT_2：</strong></p>
+<p>上面已经详细解释了这种状态，实际上<code>FIN_WAIT_2</code>状态下的<code>SOCKET</code>，表示<code>半连接</code>。也即有一方要求close连接，但另外还告诉对方，我暂时还有点数据需要传送给你（ACK信息），稍后再关闭连接。 <strong>（主动方）</strong></p>
+<p><strong>CLOSE_WAIT：</strong></p>
+<p>这种状态的含义其实是<strong>表示在等待关闭</strong>。</p>
+<p>当对方<code>close</code>一个<code>SOCKET</code>后发送FIN 报文给自己，你会毫无疑问地会回应一个<code>ACK报文</code>给对方，此时则进入到<code>CLOSE_WAIT</code>状态。接下来呢，实际上你真正需要考虑的事情是察看你是否还有数据发送给对方，如果没有的话，那么你也就可以close这个 <code>SOCKET</code>，发送<code>FIN报文</code>给对方，也即<code>关闭连接</code>。</p>
+<p>所以你在<code>CLOSE_WAIT</code>状态下，需要完成的事情是等待你去关闭连接。<strong>（被动方）</strong></p>
+<p><strong>LAST_ACK:</strong> </p>
+<p>这个状态还是比较容易好理解的，它是被动关闭一方在发送FIN报文后，最后等待对方的ACK报文。当收到ACK报文后，也即可以进入到CLOSED可用状态了。<strong>（被动方）</strong></p>
+<p><strong>TIME_WAIT:</strong> </p>
+<p>表示收到了对方的<code>FIN报文</code>，并发送出了<code>ACK报文</code>，就等<code>2MSL</code>后即可回到<code>CLOSED</code>可用状态了。 </p>
+<p>如果<code>FIN_WAIT1状态</code>下，收到了对方同时带<code>FIN标志</code>和<code>ACK标志</code>的报文时，可以直接进入到<code>TIME_WAIT状态</code>，而无须经过<code>FIN_WAIT_2状态</code>。<strong>(主动方)</strong></p>
+<p><strong>CLOSED:</strong>  表示连接中断。</p>
+<h3 id="为什么存在TIME-WAIT？"><a href="#为什么存在TIME-WAIT？" class="headerlink" title="为什么存在TIME_WAIT？"></a>为什么存在<code>TIME_WAIT</code>？</h3><p><code>TIME_WAIT</code>状态存在的理由：</p>
+<h4 id="1）可靠地实现TCP全双工连接的终止"><a href="#1）可靠地实现TCP全双工连接的终止" class="headerlink" title="1）可靠地实现TCP全双工连接的终止"></a><strong>1）可靠地实现TCP全双工连接的终止</strong></h4><p>在进行关闭连接四次挥手协议时，最后的<code>ACK</code>是由主动关闭端发出的，如果这个最终的<code>ACK</code>丢失，服务器将重发最终的FIN，因此客户端必须维护状态信息允许它重发最终的<code>ACK</code>。如果不维持这个状态信息，那么客户端将响应<code>RST</code>分节，服务器将此分节解释成一个错误（在java中会抛出<code>connection reset</code>的<code>SocketException</code>)。</p>
+<p>因而，要实现TCP全双工连接的正常终止，必须处理终止序列四个分节中任何一个分节的丢失情况，主动关闭的客户端必须维持状态信息进入<code>TIME_WAIT</code>状态。 </p>
+<h4 id="2）允许老的重复分节在网络中消逝"><a href="#2）允许老的重复分节在网络中消逝" class="headerlink" title="2）允许老的重复分节在网络中消逝"></a><strong>2）允许老的重复分节在网络中消逝</strong></h4><p><code>TCP</code>分节可能由于路由器异常而“迷途（延迟）”，在迷途期间，TCP发送端可能因确认超时而重发这个分节，迷途的分节在路由器修复后也会被送到最终目的地，这个原来的迷途分节就称为<code>lost duplicate</code>。</p>
+<p>在关闭一个TCP连接后，马上又重新建立起一个相同的IP地址和端口之间的TCP连接，后一个连接被称为前一个连接的化身（<code>incarnation</code>)，那么有可能出现这种情况，前一个连接的迷途重复分组在前一个连接终止后出现，从而被误解成从属于新的化身。</p>
+<p>为了避免这个情况，<code>TCP</code>不允许处于<code>TIME_WAIT</code>状态的连接启动一个新的化身，因为<code>TIME_WAIT</code>状态持续<code>2MSL</code>，就可以保证当成功建立一个<code>TCP</code>连接的时候，来自连接先前化身的重复分组已经在网络中消逝。</p>
+<h3 id="处于该状态（TIME-WAIT）的socket什么时候可以再次使用？"><a href="#处于该状态（TIME-WAIT）的socket什么时候可以再次使用？" class="headerlink" title="处于该状态（TIME_WAIT）的socket什么时候可以再次使用？"></a>处于该状态（<code>TIME_WAIT</code>）的<code>socket</code>什么时候可以再次使用？</h3><ul>
+<li><code>2MSL</code>之后；</li>
+<li>如果处于<code>2MSL</code>期间，重用连接那么要保证新连接的<code>TCP</code>的<code>Seq</code>也就是序列号要比之前的大；</li>
+<li>如果处于<code>2MS</code>期间，重用的连接要保证后续的时间戳要比之前的连接的时间戳更晚；</li>
+</ul>
+<p>只有满足上面的条件才不会在发生新连接上出现老连接的延迟的<code>IP分组</code>，满足第一个条件则不会出现。</p>
+<h3 id="为什么客户端最后还要等待2MSL？"><a href="#为什么客户端最后还要等待2MSL？" class="headerlink" title="为什么客户端最后还要等待2MSL？"></a><strong>为什么客户端最后还要等待2MSL？</strong></h3><p><code>MSL（Maximum Segment Lifetime）</code>，TCP允许不同的实现可以设置不同的MSL值：</p>
+<figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">MSL（客户端发送给服务端最大报文时长） + MSL（服务端返回给客户端的最大报文时长） = 2*MSL;</span><br></pre></td></tr></table></figure>
+
+<p>原因有二：</p>
+<ul>
+<li><strong>保证TCP协议的全双工连接能够可靠关闭；</strong></li>
+<li><strong>保证这次连接的重复数据段从网络中消失；</strong></li>
+</ul>
+<p><strong>第一点</strong>：如果<strong>主机1</strong>直接<code>CLOSED</code>了，那么由于IP协议的不可靠性或者是其它网络原因，导致<strong>主机2</strong>没有收到<strong>主机1</strong>最后回复的<code>ACK</code>。</p>
+<p>那么<strong>主机2</strong>就会在超时之后继续发送<code>FIN</code>，此时由于<strong>主机1</strong>已经<code>CLOSED</code>了，就找不到与重发的FIN对应的连接。所以，主机1不是直接进入<code>CLOSED</code>，而是要保持<code>TIME_WAIT</code>，当再次收到<code>FIN</code>的时候，能够保证对方收到<code>ACK</code>，最后正确的关闭连接。</p>
+<p><strong>第二点</strong>：如果<strong>主机1</strong>直接<code>CLOSED</code>，然后又再向<strong>主机2</strong>发起一个新连接，我们不能保证这个新连接与刚关闭的连接的端口号是不同的。也就是说有可能新连接和老连接的端口号是相同的。</p>
+<p><strong>一般来说不会发生什么问题，但是还是有特殊情况出现：</strong></p>
+<p><strong>假设新连接和已经关闭的老连接端口号是一样的，如果前一次连接的某些数据仍然滞留在网络中，这些延迟数据在建立新连接之后才到达主机2，由于新连接和老连接的端口号是一样的，<code>TCP</code>协议就认为那个延迟的数据是属于新连接的，这样就和真正的新连接的数据包发生混淆了。</strong></p>
+<p><strong>所以TCP连接还要在<code>TIME_WAIT</code>状态等待<code>2*MSL</code>，这样可以保证本次连接的所有数据都从网络中消失。</strong></p>
+<h3 id="大量TIME-WAIT造成的影响？"><a href="#大量TIME-WAIT造成的影响？" class="headerlink" title="大量TIME_WAIT造成的影响？"></a><strong>大量TIME_WAIT造成的影响？</strong></h3><p>在<strong>高并发短连接</strong>的TCP服务器上，当服务器处理完请求后立刻主动正常关闭连接。</p>
+<p>这个场景下会出现大量<code>socket</code>处于<code>TIME_WAIT</code>状态。如果客户端的并发量持续很高，此时部分客户端就会显示连接不上。</p>
+<p>主动正常关闭TCP连接，都会出现<code>TIME_WAIT</code>。</p>
+<h4 id="为什么我们要关注这个高并发短连接呢？"><a href="#为什么我们要关注这个高并发短连接呢？" class="headerlink" title="为什么我们要关注这个高并发短连接呢？"></a>为什么我们要关注这个高并发短连接呢？</h4><p>有两个方面需要注意：</p>
+<ol>
+<li><p><strong>高并发可以让服务器在短时间范围内同时占用大量端口</strong>，而端口有个<code>0~65535</code>的范围，并不是很多，刨除系统和其他服务要用的，剩下的就更少了。</p>
+</li>
+<li><p>在这个场景中，<strong>短连接表示“业务处理+传输数据的时间 远远小于 <code>TIME_WAIT</code>超时的时间”的连接</strong>。</p>
+</li>
+</ol>
+<p>这里有个相对长短的概念，比如取一个web页面，1秒钟的<code>http短连接</code>处理完业务，在关闭连接之后，这个业务用过的端口会停留在<code>TIME_WAIT</code>状态几分钟，而这几分钟，其他HTTP请求来临的时候是无法占用此端口的（<strong>占着茅坑不拉翔</strong>）。单用这个业务计算服务器的利用率会发现，服务器干正经事的时间和端口（资源）被挂着无法被使用的时间的比例是<code>1：几百</code>，服务器资源严重浪费。</p>
+<p>说个题外话，从这个意义出发来考虑服务器性能调优的话，<code>长连接</code>业务的服务就不需要考虑<code>TIME_WAIT</code>状态。同时，假如你对服务器业务场景非常熟悉，你会发现，在实际业务场景中，一般<strong>长连接对应的业务的并发量并不会很高</strong>。</p>
+<p>   综合这两个方面，持续的到达一定量的高并发短连接，会使服务器因端口资源不足而拒绝为一部分客户服务。同时，这些端口都是服务器临时分配，无法用<code>SO_REUSEADDR</code>选项解决这个问题。</p>
+<h3 id="为什么建立连接是三次握手，关闭连接确是四次挥手呢？"><a href="#为什么建立连接是三次握手，关闭连接确是四次挥手呢？" class="headerlink" title="为什么建立连接是三次握手，关闭连接确是四次挥手呢？"></a><strong>为什么建立连接是三次握手，关闭连接确是四次挥手呢？</strong></h3><p><strong>建立连接</strong>的时候， 服务器在<code>LISTEN状态</code>下，收到建立连接请求的<code>SYN报文</code>后，把<code>ACK</code>和<code>SYN</code>放在一个报文里发送给客户端。</p>
+<p>而<strong>关闭连接</strong>时，服务器收到对方的<code>FIN报文</code>时，仅仅表示对方不再发送数据了但是还能接收数据，而自己也未必全部数据都发送给对方了，所以己方可以立即关闭，也可以发送一些数据给对方后，再发送<code>FIN</code>报文给对方来表示同意现在关闭连接，因此，己方<code>ACK</code>和<code>FIN</code>一般都会分开发送，从而导致多了一次。</p>
+<h3 id="如何避免TIME-WAIT？"><a href="#如何避免TIME-WAIT？" class="headerlink" title="如何避免TIME_WAIT？"></a>如何避免<code>TIME_WAIT</code>？</h3><p>假如当前程序重启，则可调用<code>SO_REUSEADDR</code>来进行端口重新占用，从而绕过<code>TIME_WAIT</code>。</p>
+<h3 id="如何处理大量TIME-WAIT？"><a href="#如何处理大量TIME-WAIT？" class="headerlink" title="如何处理大量TIME_WAIT？"></a>如何处理大量<code>TIME_WAIT</code>？</h3><p>倘若存在大量<code>time_wait</code>状态连接，则会导致大量端口占用，同时客户端发起大量连接请求的话，此时会出现大量<code>SYN</code>状态的连接等待。</p>
+<p>编辑内核文件<code>/etc/sysctl.conf</code>，加入以下内容：</p>
+<h4 id="syn-cookies（syn缓存）"><a href="#syn-cookies（syn缓存）" class="headerlink" title="syn_cookies（syn缓存）"></a>syn_cookies（syn缓存）</h4><figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">net.ipv4.tcp_syncookies = 1</span><br></pre></td></tr></table></figure>
+
+<p> 表示开启<code>SYN Cookies</code>。</p>
+<p>当出现<code>SYN</code>等待队列溢出时，启用<code>cookies</code>来处理，可防范少量SYN攻击，默认为0，表示关闭；</p>
+<h4 id="tw-reuse（重用）"><a href="#tw-reuse（重用）" class="headerlink" title="tw_reuse（重用）"></a>tw_reuse（重用）</h4><figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">net.ipv4.tcp_tw_reuse = 1</span><br></pre></td></tr></table></figure>
+
+<p>表示开启<strong>重用</strong>。</p>
+<p>允许将<code>TIME-WAIT</code> <code>sockets</code>重新用于新的<code>TCP</code>连接，默认为0，表示关闭；</p>
+<h4 id="tw-recycle（快速回收）"><a href="#tw-recycle（快速回收）" class="headerlink" title="tw_recycle（快速回收）"></a>tw_recycle（快速回收）</h4><figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">net.ipv4.tcp_tw_recycle = 1</span><br></pre></td></tr></table></figure>
+
+<p>表示开启TCP连接中<code>TIME-WAIT</code> <code>sockets</code>的快速回收，默认为0，表示关闭。</p>
+<h4 id="fin-timeout（fin结束时间）"><a href="#fin-timeout（fin结束时间）" class="headerlink" title="fin_timeout（fin结束时间）"></a>fin_timeout（fin结束时间）</h4><figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">net.ipv4.tcp_fin_timeout</span><br></pre></td></tr></table></figure>
+
+<p>修改系默认的 <code>TIMEOUT</code> 时间。</p>
+<p>然后执行<code>/sbin/sysctl -p</code> 让参数生效。</p>
+<p><code>/etc/sysctl.conf</code>是一个允许改变正在运行中的<code>Linux</code>系统的接口，它包含一些<code>TCP/IP堆栈</code>和虚拟内存系统的高级选项，修改内核参数永久生效。</p>
+<p>简单来说，就是打开系统的<code>TIME_WAIT</code>重用和快速回收。</p>
+<h4 id="进阶调优"><a href="#进阶调优" class="headerlink" title="进阶调优"></a>进阶调优</h4><p>如果以上配置调优后性能还不理想，可继续修改一下配置：</p>
+<figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">#</span><span class="bash"> 表示当keepalive起用的时候，TCP发送keepalive消息的频度。缺省是2小时，改为20分钟。</span></span><br><span class="line">vi /etc/sysctl.confnet.ipv4.tcp_keepalive_time = 1200 </span><br><span class="line"><span class="meta">#</span><span class="bash"> 表示用于向外连接的端口范围。缺省情况下很小：32768到61000，改为1024到65000。</span></span><br><span class="line">net.ipv4.ip_local_port_range = 102465000 </span><br><span class="line"><span class="meta">#</span><span class="bash"> 表示SYN队列的长度，默认为1024，加大队列长度为8192，可以容纳更多等待连接的网络连接数。</span></span><br><span class="line">net.ipv4.tcp_max_syn_backlog = 8192 </span><br><span class="line"><span class="meta">#</span><span class="bash"> 表示系统同时保持TIME_WAIT套接字的最大数量，如果超过这个数字，TIME_WAIT套接字将立刻被清除并打印警告信息。</span></span><br><span class="line"><span class="meta">#</span><span class="bash"> 默认为180000，改为5000。</span></span><br><span class="line"><span class="meta">#</span><span class="bash"> 对于Apache、Nginx等服务器，上几行的参数可以很好地减少TIME_WAIT套接字数量，但是对于 Squid，效果却不大。</span></span><br><span class="line">net.ipv4.tcp_max_tw_buckets = 5000</span><br></pre></td></tr></table></figure>
+
+<p>此项参数可以控制<code>TIME_WAIT</code>套接字的最大数量，避免<code>Squid</code>服务器被大量的<code>TIME_WAIT</code>套接字拖死。</p>
 
       </div>
       
         <div class="prev-or-next">
           <div class="post-foot-next">
             
-              <a href="/2020/07/24/%E9%9D%A2%E8%AF%95%E5%AE%98%EF%BC%9A%E7%BC%93%E5%AD%98%E7%A9%BF%E9%80%8F%E3%80%81%E7%BC%93%E5%AD%98%E9%9B%AA%E5%B4%A9%E3%80%81%E7%BC%93%E5%AD%98%E5%87%BB%E7%A9%BF%E5%8F%8A%E5%85%B6%E5%A4%84%E7%90%86%E6%96%B9%E5%BC%8F%EF%BC%9F/" target="_self">
+              <a href="/2020/07/26/G1%E5%9E%83%E5%9C%BE%E6%94%B6%E9%9B%86%E5%99%A8%E8%AE%B2%E8%A7%A3/" target="_self">
                 <i class="iconfont icon-chevronleft"></i>
                 <span>PREV</span>
               </a>
@@ -172,6 +276,11 @@
           </div>
           <div class="post-foot-prev">
             
+              <a href="/2020/07/27/CMS%E5%9E%83%E5%9C%BE%E6%94%B6%E9%9B%86%E5%99%A8%E8%AE%B2%E8%A7%A3/" target="_self">
+                <span>NEXT</span>
+                <i class="iconfont icon-chevronright"></i>
+              </a>
+            
           </div>
         </div>
       
@@ -180,7 +289,7 @@
   <div class="post-catalog" id="catalog">
     <div class="title">目录</div>
     <div class="catalog-content">
-      <ol class="toc"><li class="toc-item toc-level-2"><a class="toc-link" href="#四次挥手"><span class="toc-text">四次挥手</span></a></li></ol>
+      <ol class="toc"><li class="toc-item toc-level-2"><a class="toc-link" href="#四次挥手"><span class="toc-text">四次挥手</span></a><ol class="toc-child"><li class="toc-item toc-level-3"><a class="toc-link" href="#为什么要四次挥手"><span class="toc-text">为什么要四次挥手?</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#为什么存在TIME-WAIT？"><span class="toc-text">为什么存在TIME_WAIT？</span></a><ol class="toc-child"><li class="toc-item toc-level-4"><a class="toc-link" href="#1）可靠地实现TCP全双工连接的终止"><span class="toc-text">1）可靠地实现TCP全双工连接的终止</span></a></li><li class="toc-item toc-level-4"><a class="toc-link" href="#2）允许老的重复分节在网络中消逝"><span class="toc-text">2）允许老的重复分节在网络中消逝</span></a></li></ol></li><li class="toc-item toc-level-3"><a class="toc-link" href="#处于该状态（TIME-WAIT）的socket什么时候可以再次使用？"><span class="toc-text">处于该状态（TIME_WAIT）的socket什么时候可以再次使用？</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#为什么客户端最后还要等待2MSL？"><span class="toc-text">为什么客户端最后还要等待2MSL？</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#大量TIME-WAIT造成的影响？"><span class="toc-text">大量TIME_WAIT造成的影响？</span></a><ol class="toc-child"><li class="toc-item toc-level-4"><a class="toc-link" href="#为什么我们要关注这个高并发短连接呢？"><span class="toc-text">为什么我们要关注这个高并发短连接呢？</span></a></li></ol></li><li class="toc-item toc-level-3"><a class="toc-link" href="#为什么建立连接是三次握手，关闭连接确是四次挥手呢？"><span class="toc-text">为什么建立连接是三次握手，关闭连接确是四次挥手呢？</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#如何避免TIME-WAIT？"><span class="toc-text">如何避免TIME_WAIT？</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#如何处理大量TIME-WAIT？"><span class="toc-text">如何处理大量TIME_WAIT？</span></a><ol class="toc-child"><li class="toc-item toc-level-4"><a class="toc-link" href="#syn-cookies（syn缓存）"><span class="toc-text">syn_cookies（syn缓存）</span></a></li><li class="toc-item toc-level-4"><a class="toc-link" href="#tw-reuse（重用）"><span class="toc-text">tw_reuse（重用）</span></a></li><li class="toc-item toc-level-4"><a class="toc-link" href="#tw-recycle（快速回收）"><span class="toc-text">tw_recycle（快速回收）</span></a></li><li class="toc-item toc-level-4"><a class="toc-link" href="#fin-timeout（fin结束时间）"><span class="toc-text">fin_timeout（fin结束时间）</span></a></li><li class="toc-item toc-level-4"><a class="toc-link" href="#进阶调优"><span class="toc-text">进阶调优</span></a></li></ol></li></ol></li></ol>
     </div>
   </div>
 
