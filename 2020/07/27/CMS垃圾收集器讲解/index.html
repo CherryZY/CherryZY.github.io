@@ -126,6 +126,52 @@
       <div class="markdown-body">
         <p>本文整体结构如下：</p>
 <p><img src="http://qd2x6jysb.bkt.clouddn.com/image-20200727143553122.png" alt="image-20200727143553122"></p>
+<p>CMS收集器是一种以获取最短回收停顿时间为目标的收集器。<br>CMS收集器是基于标记-清除算法实现的，是一种老年代收集器，通常与ParNew一起使用。</p>
+<h2 id="收集过程"><a href="#收集过程" class="headerlink" title="收集过程"></a>收集过程</h2><p><img src="http://qd2x6jysb.bkt.clouddn.com/image-20200728010409132.png" alt="image-20200728010409132"></p>
+<ul>
+<li><p>初始标记（STW）：</p>
+<p>需要“Stop the World”，初始标记仅仅只是标记一下GC Root能直接关联到的对象，速度很快。</p>
+</li>
+<li><p>并发标记：</p>
+<p>是主要标记过程，这个标记过程是和用户线程并发执行的。</p>
+</li>
+<li><p>并发预处理：</p>
+<p>标记从新生代晋升的对象、新分配到老年代的对象以及在并发阶段被修改了的对象。</p>
+</li>
+<li><p>重新标记（STW）：</p>
+<p>需要“Stop the World”，为了修正并发标记期间因用户程序继续运作而导致标记产生变动的那一部分对象的标记记录（停顿时间比初始标记长，但比并发标记短得多）。</p>
+</li>
+<li><p>并发清除：</p>
+<p>和用户线程并发执行的，基于标记结果来清理对象。</p>
+</li>
+</ul>
+<h3 id="如果在重新标记之前刚好发生了一次MinorGC，会不会导致重新标记阶段Stop-the-World时间太长？"><a href="#如果在重新标记之前刚好发生了一次MinorGC，会不会导致重新标记阶段Stop-the-World时间太长？" class="headerlink" title="如果在重新标记之前刚好发生了一次MinorGC，会不会导致重新标记阶段Stop the World时间太长？"></a>如果在重新标记之前刚好发生了一次MinorGC，会不会导致重新标记阶段Stop the World时间太长？</h3><p>不会的，在并发标记阶段其实还包括了一次并发的预清理阶段，虚拟机会主动等待年轻代发生垃圾回收，这样可以将重新标记对象引用关系的步骤放在并发标记阶段，有效降低重新标记阶段Stop The World的时间。</p>
+<h2 id="优点"><a href="#优点" class="headerlink" title="优点"></a>优点</h2><ul>
+<li>并发收集；</li>
+<li>停顿时间短；</li>
+<li>吞吐量大。</li>
+</ul>
+<h2 id="缺点"><a href="#缺点" class="headerlink" title="缺点"></a>缺点</h2><ul>
+<li><p>对<strong>CPU资源非常敏感</strong>，因为并发标记和并发清理阶段和用户线程一起运行，当CPU数变小时，性能容易出现问题，总吞吐量会降低。</p>
+</li>
+<li><p><strong>浮动垃圾</strong>（Floating Garbage）</p>
+<p>收集过程中会产生<strong>浮动垃圾</strong>，所以不可以在老年代内存不够用了才进行垃圾回收，必须提前进行垃圾收集。<br>通过参数<code>-XX:CMSInitiatingOccupancyFraction</code>的值来控制内存使用百分比。如果该值设置的太高，那么在CMS运行期间预留的内存可能无法满足程序所需，会出现<code>Concurrent Mode Failure</code>失败，之后会临时使用<code>Serial Old</code>收集器做为老年代收集器，会产生更长时间的停顿。</p>
+</li>
+</ul>
+<p>  由于在应用运行的同时进行垃圾回收，所以有些垃圾可能在垃圾回收进行完成时产生，这样就造成了“<strong>Floating Garbage</strong>”，这些垃圾需要在下次垃圾回收周期时才能回收掉。所以，并发收集器一般需要20%的预留空间用于这些浮动垃圾。</p>
+<p>  内存碎片导致老年代空间碎片产生，虽然有大量空间可用，但是没有足够的连续空间可用，会导致一次Full GC。</p>
+<p>  <strong>如果空间不够放“浮动垃圾”，会将当前垃圾回收器转为SerialOld。</strong></p>
+<ul>
+<li><p><strong>内存碎片</strong></p>
+<p><strong>标记-清除</strong> 方式会产生内存碎片。</p>
+<p><strong>解决</strong>：</p>
+<ul>
+<li>可以使用参数<code>-XX:UseCMSCompactAtFullCollection</code>来控制是否开启内存整理（无法并发，默认是开启的）。<br>参数<code>-XX:CMSFullGCsBeforeCompaction</code>用于设置执行多少次不压缩的<code>Full GC</code>后进行一次带压缩的内存碎片整理（默认值是0）。<br>内存整理无法并发，导致停顿时间会延长。</li>
+<li>参数<code>-XX:CMSFullGCsBeforeCompaction</code> ，用于设置执行多少次不压缩的<code>Full GC</code>后，跟着来一次压缩的。<br>（默认值0，表示每次进入Full GC都进行碎片整理）</li>
+</ul>
+</li>
+</ul>
+<p>在<code>CMS</code>中，也有<code>RSet</code>的概念，在老年代中有一块区域用来记录指向新生代的引用。这是一种<code>point-out</code>，在进行Young GC时，扫描根时，仅仅需要扫描这一块区域，而不需要扫描整个老年代。</p>
 
       </div>
       
@@ -172,6 +218,18 @@
       
     </div>
     
+  <div class="post-catalog" id="catalog">
+    <div class="title">目录</div>
+    <div class="catalog-content">
+      <ol class="toc"><li class="toc-item toc-level-2"><a class="toc-link" href="#收集过程"><span class="toc-text">收集过程</span></a><ol class="toc-child"><li class="toc-item toc-level-3"><a class="toc-link" href="#如果在重新标记之前刚好发生了一次MinorGC，会不会导致重新标记阶段Stop-the-World时间太长？"><span class="toc-text">如果在重新标记之前刚好发生了一次MinorGC，会不会导致重新标记阶段Stop the World时间太长？</span></a></li></ol></li><li class="toc-item toc-level-2"><a class="toc-link" href="#优点"><span class="toc-text">优点</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#缺点"><span class="toc-text">缺点</span></a></li></ol>
+    </div>
+  </div>
+
+  
+<script src="/js/catalog.js"></script>
+
+
+
 
     
       <div class="comments-container">
