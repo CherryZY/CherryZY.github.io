@@ -359,19 +359,24 @@
 <li><p><strong>晋升失败</strong></p>
 <p>并发周期结束后，是混合垃圾回收周期，伴随着年轻代垃圾收集，进行清理老年代空间，如果这个时候清理的速度小于消耗的速度，导致<strong>老年代不够用</strong>，那么会发生晋升失败。</p>
 <p><strong>解决方式：</strong></p>
-</li>
-</ul>
+<p>G1在进行GC的时候没有足够的内存供存活对象或晋升对象使用，由此触发了<code>Full GC</code>。可以在日志中看到（<code>to-space exhausted</code>）或者（<code>to-space overflow</code>）。解决这种问题的方式是：</p>
 <ul>
+<li>增加 <code>-XX:G1ReservePercent</code> 选项的值（并相应增加总的堆大小），为“目标空间”增加预留内存量；</li>
+<li>通过减少<code>-XX:InitiatingHeapOccupancyPercent</code>提前启动标记周期；</li>
+<li>也可以通过增加 <code>-XX:ConcGCThreads</code> 选项的值来增加并行标记线程的数目；</li>
+</ul>
+</li>
 <li><p><strong>疏散失败</strong></p>
 <p>年轻代垃圾收集的时候，如果 <code>Survivor</code>和 <code>Old 区</code>没有足够的空间容纳所有的存活对象。</p>
 <p>这种情况肯定是非常致命的，因为基本上已经没有多少空间可以用了，这个时候会触发 Full GC 也是很合理的。</p>
 <p><strong>解决方式：</strong></p>
+<p>如上</p>
 </li>
-</ul>
-<ul>
 <li><p><strong>大对象分配失败</strong></p>
 <p>应该尽可能地不创建大对象，尤其是大于一个区块大小的那种对象。</p>
 <p><strong>解决方式：</strong></p>
+<p>当巨型对象找不到合适的空间进行分配时，就会启动<code>Full GC</code>，来释放空间。</p>
+<p>这种情况下，应该避免分配大量的巨型对象，增加内存或者增大<code>-XX:G1HeapRegionSize</code>，使巨型对象不再是巨型对象。</p>
 </li>
 </ul>
 <h2 id="特点"><a href="#特点" class="headerlink" title="特点"></a>特点</h2><p>G1跟踪各个<code>Region</code>里面的垃圾堆积的<strong>价值大小</strong>（回收所获得的空间大小以及回收所需时间经验值），在后台维护一个<strong>优先列表</strong>，每次根据允许的收集时间，优先回收价值最大的<code>Regin</code>。</p>
