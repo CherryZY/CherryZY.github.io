@@ -213,6 +213,111 @@
 <figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">_gc_overhead_perc = <span class="number">100.0</span>×(<span class="number">1.0</span>/(<span class="number">1.0</span>+GCTimeRatio))</span><br></pre></td></tr></table></figure>
 
 <p>扩展时有一个参数<code>G1ExpandByPercentOfAvailable</code>（默认值是20）来控制一次扩展的比例，即每次都至少从未提交的内存中申请20%，有下限要求（一次申请的内存不能少于1M，最多是当前已分配的一倍）。</p>
+<h2 id="对象分配"><a href="#对象分配" class="headerlink" title="对象分配"></a>对象分配</h2><p><img src="http://qd2x6jysb.bkt.clouddn.com/image-20200729032747130.png" alt="image-20200729032747130"></p>
+<h3 id="主流程"><a href="#主流程" class="headerlink" title="主流程"></a>主流程</h3><p>源码：</p>
+<p>以下代码来自：<a href="https://www.jianshu.com/p/990be3c62993" target="_blank" rel="noopener">JVM之对象分配（G1）</a> 以及 <a href="https://download.java.net/openjdk/jdk7/" target="_blank" rel="noopener">https://download.java.net/openjdk/jdk7/</a></p>
+<p>首先从运行时常量池中获取 <code>Klass</code> 对象，调用<code>check_valid_for_instantiation</code>方法，确保初始化的类的有效性（也就是类加载流程走一遍<code>加载=&gt;验证=&gt;准备=&gt;解析=&gt;初始化</code>），同时检查对象是否已经加载（否则通过类加载器加载<code>class</code>），然后调用<code>allocate_instance</code> 方法，创建对象。</p>
+<p>来自：<code>openjdk\hotspot\src\share\vm\interpreter\interpreterRuntime.cpp</code></p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br></pre></td><td class="code"><pre><span class="line">IRT_ENTRY(<span class="keyword">void</span>, InterpreterRuntime::_new(JavaThread* thread, constantPoolOopDesc* pool, <span class="keyword">int</span> index))</span><br><span class="line"></span><br><span class="line">  <span class="comment">//从运行时常量池中获取KlassOop</span></span><br><span class="line">  klassOop k_oop = pool-&gt;klass_at(index, CHECK);</span><br><span class="line">  <span class="function">instanceKlassHandle <span class="title">klass</span> <span class="params">(THREAD, k_oop)</span></span>;</span><br><span class="line"></span><br><span class="line">  <span class="comment">// 确保我们没有实例化一个抽象的klass</span></span><br><span class="line">  klass-&gt;check_valid_for_instantiation(<span class="literal">true</span>, CHECK);</span><br><span class="line"></span><br><span class="line">  <span class="comment">// 保证已经完成类加载和初始化</span></span><br><span class="line">  klass-&gt;initialize(CHECK);</span><br><span class="line"></span><br><span class="line">  <span class="comment">//分配对象</span></span><br><span class="line">  oop obj = klass-&gt;allocate_instance(CHECK);</span><br><span class="line">  thread-&gt;set_vm_result(obj);</span><br><span class="line">IRT_END</span><br></pre></td></tr></table></figure>
+
+<p>来自：<code>openjdk\hotspot\src\share\vm\oops\instanceKlass.cpp</code></p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br></pre></td><td class="code"><pre><span class="line"><span class="function">instanceOop <span class="title">instanceKlass::allocate_instance</span><span class="params">(TRAPS)</span> </span>&#123;</span><br><span class="line">  assert(!oop_is_instanceMirror(), <span class="string">"wrong allocation path"</span>);</span><br><span class="line">  <span class="comment">//是否重写finalize()方法</span></span><br><span class="line">  <span class="keyword">bool</span> has_finalizer_flag = has_finalizer(); <span class="comment">// Query before possible GC</span></span><br><span class="line">  <span class="comment">//分配的对象的大小</span></span><br><span class="line">  <span class="keyword">int</span> <span class="built_in">size</span> = size_helper();  <span class="comment">// Query before forming handle.</span></span><br><span class="line">  <span class="function">KlassHandle <span class="title">h_k</span><span class="params">(THREAD, as_klassOop())</span></span>;</span><br><span class="line"></span><br><span class="line">  instanceOop i;</span><br><span class="line"></span><br><span class="line">  <span class="comment">//分配对象</span></span><br><span class="line">  i = (instanceOop)CollectedHeap::obj_allocate(h_k, <span class="built_in">size</span>, CHECK_NULL);</span><br><span class="line">  <span class="keyword">if</span> (has_finalizer_flag &amp;&amp; !RegisterFinalizersAtInit) &#123;</span><br><span class="line">    i = register_finalizer(i, CHECK_NULL);</span><br><span class="line">  &#125;</span><br><span class="line">  <span class="keyword">return</span> i;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>流程太长了，我直接跳到<code>TLAB</code>分配吧：</p>
+<p>通过调用 <code>allocate_from_tlab</code> 方法，实现在<code>TLAB</code>空间分配对象：</p>
+<p><img src="http://qd2x6jysb.bkt.clouddn.com/image-20200729034814544.png" alt="image-20200729034814544"></p>
+<blockquote>
+<p>Tn表示第n个线程，深灰色表示该TLAB块已经分配完毕，浅灰色表示该TLAB块还可以分配更多的对象。</p>
+<p><strong>如何判断TLAB满了？</strong>（<code>TLABRefillWasteFraction</code> 和 <code>TLABWasteIncrement</code>）</p>
+<p>假如TLAB是1M，当我们使用800K，还是900K，还是950K时被认为满了？问题的答案是<u>如何寻找最大的可能分配对象和减少内存碎片的平衡。</u></p>
+<p>实际上虚拟机内部会维护一个叫做<code>refill_waste</code>的值，当请求对象大于<code>refill_waste</code>时，会选择在堆中分配，若小于该值，则会废弃当前<code>TLAB</code>，新建TLAB来分配对象。这个阈<strong>值可以使用<code>TLABRefillWasteFraction</code>来调整</strong>，它表示<strong>TLAB中允许产生这种浪费的比例</strong>。默认值为64，即表示使用约为<code>1/64</code>的TLAB空间作为<code>refill_waste</code>。</p>
+<p>又假如通常分配的对象大多是20K，最后剩下16K，这样导致每次都进入Eden/堆分区<strong>慢速分配</strong>中。</p>
+<p>所以，JVM还提供了一个<strong>参数<code>TLABWasteIncrement</code>（</strong>默认值为4个字）用于动态增加这个<code>refill_waste</code>的值。</p>
+<p>默认情况下，<code>TLAB</code>大小和<code>refill_waste</code>都会在运行时不断调整，使系统的运行状态达到最优。在动态调整的过程中，也不能无限制变更，所以<code>JVM</code>提供<code>MinTLABSize</code>（默认值2K）用于控制最小值。</p>
+<table>
+<thead>
+<tr>
+<th>指令</th>
+<th>释义</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>-XX:+PrintTLAB</td>
+<td>跟踪TLAB的使用情况</td>
+</tr>
+<tr>
+<td>-XX:-ResizeTLAB</td>
+<td>禁用ResizeTLAB</td>
+</tr>
+<tr>
+<td>-XX:TLABSize</td>
+<td>指定一个TLAB的大小</td>
+</tr>
+<tr>
+<td>-XX:TLABRefillWasteFraction</td>
+<td>当请求对象大于<code>refill_waste</code>时，会选择在堆中分配，若小于该值，则会废弃当前<code>TLAB</code>，新建TLAB来分配对象。（阀值）</td>
+</tr>
+<tr>
+<td>-XX:TLABWasteIncrement</td>
+<td>动态增加这个<code>refill_waste</code>的值。</td>
+</tr>
+</tbody></table>
+</blockquote>
+<p>源码地址：<code>hotspot/src/share/vm/gc_interface/collectedHeap.inline.hpp</code></p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br></pre></td><td class="code"><pre><span class="line"><span class="function">HeapWord* <span class="title">CollectedHeap::allocate_from_tlab</span><span class="params">(KlassHandle klass, Thread* thread, <span class="keyword">size_t</span> <span class="built_in">size</span>)</span> </span>&#123;</span><br><span class="line">  assert(UseTLAB, <span class="string">"should use UseTLAB"</span>);</span><br><span class="line">  <span class="comment">//TLAB分配</span></span><br><span class="line">  HeapWord* obj = thread-&gt;tlab().allocate(<span class="built_in">size</span>);</span><br><span class="line">  <span class="keyword">if</span> (obj != <span class="literal">NULL</span>) &#123;</span><br><span class="line">    <span class="keyword">return</span> obj;</span><br><span class="line">  &#125;</span><br><span class="line">  <span class="comment">// Otherwise..</span></span><br><span class="line">  <span class="comment">//慢分配</span></span><br><span class="line">  <span class="keyword">return</span> allocate_from_tlab_slow(klass, thread, <span class="built_in">size</span>);</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>先尝试在当前线程指向的<code>TLAB</code>空间分配（通过指针碰撞算法分配对象），如果对象分配成功，则返回对象，如果分配失败，则进入<strong>慢分配</strong>流程：</p>
+<blockquote>
+<p>慢分配步骤：</p>
+<ul>
+<li>TLAB的剩余空间是否太小，如果很小，即说明这个空间通常不满足对象的分配，所以最好丢弃，丢弃的方法就是填充一个dummy对象，然后申请新的TLAB来分配对象。</li>
+<li>如果不能丢弃，说明TLAB剩余空间并不小，能满足很多对象的分配，所以不能丢弃这个TLAB，否则内存浪费很多，此时可以把对象分配到堆中，不使用TLAB分配，所以可以直接返回。</li>
+</ul>
+</blockquote>
+<p>源码地址：<code>hotspot/src/share/vm/gc_interface/collectedHeap.cpp</code></p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br></pre></td><td class="code"><pre><span class="line"><span class="function">HeapWord* <span class="title">CollectedHeap::allocate_from_tlab_slow</span><span class="params">(KlassHandle klass, Thread* thread, <span class="keyword">size_t</span> <span class="built_in">size</span>)</span> </span>&#123;</span><br><span class="line">  <span class="comment">//TLAB空间剩余大小大于可忽略大小</span></span><br><span class="line">  <span class="keyword">if</span> (thread-&gt;tlab().<span class="built_in">free</span>() &gt; thread-&gt;tlab().refill_waste_limit()) &#123;</span><br><span class="line">    <span class="comment">//重设可忽略大小</span></span><br><span class="line">    thread-&gt;tlab().record_slow_allocation(<span class="built_in">size</span>);</span><br><span class="line">    <span class="keyword">return</span> <span class="literal">NULL</span>;</span><br><span class="line">  &#125;</span><br><span class="line">  <span class="comment">//计算新TLAB空间大小，说明TLAB剩余空间很小，需要重新分配TLAB</span></span><br><span class="line">  <span class="keyword">size_t</span> new_tlab_size = thread-&gt;tlab().compute_size(<span class="built_in">size</span>);</span><br><span class="line">  </span><br><span class="line">  thread-&gt;tlab().clear_before_allocation();</span><br><span class="line"></span><br><span class="line">  <span class="keyword">if</span> (new_tlab_size == <span class="number">0</span>) &#123;</span><br><span class="line">    <span class="keyword">return</span> <span class="literal">NULL</span>;</span><br><span class="line">  &#125;</span><br><span class="line"></span><br><span class="line">  <span class="comment">// 分配新的TLAB空间</span></span><br><span class="line">  HeapWord* obj = Universe::heap()-&gt;allocate_new_tlab(new_tlab_size);</span><br><span class="line">  <span class="keyword">if</span> (obj == <span class="literal">NULL</span>) &#123;</span><br><span class="line">    <span class="keyword">return</span> <span class="literal">NULL</span>;</span><br><span class="line">  &#125;</span><br><span class="line">  ........................省略..........................</span><br><span class="line">  <span class="comment">//分配对象</span></span><br><span class="line">  thread-&gt;tlab().<span class="built_in">fill</span>(obj, obj + <span class="built_in">size</span>, new_tlab_size);</span><br><span class="line">  <span class="keyword">return</span> obj;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>失败则在<code>Eden</code>空间分配：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">//在堆中分配</span></span><br><span class="line"> result = Universe::heap()-&gt;mem_allocate(<span class="built_in">size</span>,</span><br><span class="line">                                         &amp;gc_overhead_limit_was_exceeded);</span><br></pre></td></tr></table></figure>
+
+<p>源码地址：<code>hotspot\src\share\vm\gc_implementation\g1\g1CollectedHeap.cpp</code></p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br></pre></td><td class="code"><pre><span class="line">HeapWord*</span><br><span class="line">G1CollectedHeap::mem_allocate(<span class="keyword">size_t</span> word_size,</span><br><span class="line">                              <span class="keyword">bool</span>*  gc_overhead_limit_was_exceeded) &#123;</span><br><span class="line">  assert_heap_not_locked_and_not_at_safepoint();</span><br><span class="line"></span><br><span class="line">  <span class="keyword">for</span> (<span class="keyword">int</span> try_count = <span class="number">1</span>; <span class="comment">/* we'll return */</span>; try_count += <span class="number">1</span>) &#123;</span><br><span class="line">    <span class="keyword">unsigned</span> <span class="keyword">int</span> gc_count_before;</span><br><span class="line"></span><br><span class="line">    HeapWord* result = <span class="literal">NULL</span>;</span><br><span class="line">    <span class="keyword">if</span> (!isHumongous(word_size)) &#123;</span><br><span class="line">      <span class="comment">//在Region里面分配对象</span></span><br><span class="line">      result = attempt_allocation(word_size, &amp;gc_count_before);</span><br><span class="line">    &#125; <span class="keyword">else</span> &#123;</span><br><span class="line">     <span class="comment">//在region中分配巨型对象</span></span><br><span class="line">      result = attempt_allocation_humongous(word_size, &amp;gc_count_before);</span><br><span class="line">    &#125;</span><br><span class="line">    <span class="keyword">if</span> (result != <span class="literal">NULL</span>) &#123;</span><br><span class="line">      <span class="keyword">return</span> result;</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="comment">// 触发GC</span></span><br><span class="line">    <span class="function">VM_G1CollectForAllocation <span class="title">op</span><span class="params">(gc_count_before, word_size)</span></span>;</span><br><span class="line">    <span class="comment">// ...and get the VM thread to execute it.</span></span><br><span class="line">    VMThread::execute(&amp;op);</span><br><span class="line">    ..........................省略.............................</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p><code>attempt_allocation</code>分配流程图：</p>
+<p><img src="http://qd2x6jysb.bkt.clouddn.com/image-20200729040347641.png" alt="image-20200729040347641"></p>
+<blockquote>
+<p>下文摘自：《JVM G1源码分析和调优》第三章</p>
+</blockquote>
+<h3 id="TLAB内存分配"><a href="#TLAB内存分配" class="headerlink" title="TLAB内存分配"></a>TLAB内存分配</h3><h4 id="快速无锁分配"><a href="#快速无锁分配" class="headerlink" title="快速无锁分配"></a><strong>快速无锁分配</strong></h4><p>指的是在当前可以分配的堆分区中使用<code>CAS</code>来获取一块内存，如果成功则可以作为<code>TLAB</code>的空间。因为使用CAS可以并行分配，当然也有可能不成功。对于不成功则进行慢速分配。</p>
+<h4 id="慢速分配"><a href="#慢速分配" class="headerlink" title="慢速分配"></a><strong>慢速分配</strong></h4><ul>
+<li>首先尝试对堆分区进行加锁分配，成功则返回，在<code>attempt_allocation_locked</code>完成。</li>
+<li>不成功，则判定是否可以对新生代分区进行扩展，如果可以扩展则扩展后再分配<code>TLAB</code>，成功则返回，在<code>attempt_allocation_force</code>完成。</li>
+<li>不成功，判定是否可以进行垃圾回收，如果可以进行垃圾回收后再分配，成功则返回，在<code>do_collection_pause</code>完成。</li>
+<li>不成功，如果尝试分配次数达到阈值（默认值是2次）则返回失败。</li>
+<li>如果还可以继续尝试，再次判定是否进行快速分配，如果成功则返回。</li>
+<li>不成功重新再尝试一次，直到成功或者达到阈值失败。</li>
+</ul>
+<p>所以慢速分配要么成功分配，要么尝试次数达到阈值后结束并返回<code>NULL</code>。</p>
+<h3 id="堆慢速内存分配"><a href="#堆慢速内存分配" class="headerlink" title="堆慢速内存分配"></a>堆慢速内存分配</h3><p>这里的慢速分配是指在<code>TLAB</code>中经过努力分配还不能成功，再次进入慢速分配：</p>
+<ul>
+<li><code>attempt_allocation</code>尝试进行对象分配，如果成功则返回。值得注意的是在<code>attempt_allocation</code>里面可能会进行垃圾回收，这里的垃圾回收是指增量的垃圾回收，主要是新生代或者混合收集。</li>
+<li>如果大对象在<code>attempt_allocation_humongous</code>，直接分配的老生代。</li>
+<li>如果分配不成功，则进行GC垃圾回收，注意这里的回收主要是<code>FullGC</code>，然后再分配。因为这里是分配的最后一步，所以进行几次不同的垃圾回收和尝试。主要代码在<code>satisfy_failed_allocation</code>（如上<code>G1CollectedHeap::mem_allocate</code>）中。</li>
+<li>最终成功分配或者失败达到一定次数，则分配失败。</li>
+</ul>
+<p><img src="http://qd2x6jysb.bkt.clouddn.com/image-20200729041252067.png" alt="image-20200729041252067"></p>
+<h3 id="大对象分配"><a href="#大对象分配" class="headerlink" title="大对象分配"></a>大对象分配</h3><ul>
+<li>尝试垃圾回收，这里主要是增量回收，同时启动并发标记。</li>
+<li>尝试开始分配对象，对于大对象分为两类，一类是大于<code>HeapRegionSize</code>的一半，但是小于<code>HeapRegionSize</code>，即一个完整的堆分区可以保存，则直接从空闲列表直接拿一个堆分区，或者分配一个新的堆分区。如果是连续对象，则需要多个堆分区，思路同上，但是处理的时候需要加锁。</li>
+<li>如果失败再次尝试垃圾回收，之后再分配。</li>
+<li>最终成功分配或者失败达到一定次数，则分配失败。</li>
+</ul>
+<h3 id="最后的分配尝试"><a href="#最后的分配尝试" class="headerlink" title="最后的分配尝试"></a>最后的分配尝试</h3><p>先尝试分配一下，因为并发之后可能可以分配：</p>
+<ul>
+<li>尝试扩展新的分区，成功则返回。</li>
+<li>不成功进行Full GC，但是不回收软引用，再次分配成功则返回。</li>
+<li>不成功进行Full GC，回收软引用，最后一次分配成功则返回；不成功返回NULL，即分配失败。</li>
+</ul>
 <h2 id="GC模式"><a href="#GC模式" class="headerlink" title="GC模式"></a>GC模式</h2><p><code>G1</code>提供了两种<strong>GC模式</strong>：</p>
 <ul>
 <li><p><code>Young GC</code></p>
@@ -280,8 +385,27 @@
 <td align="left">设置触发标记周期的 Java 堆占用率阈值。默认值是45%。这里的java堆占比指的是<code>non_young_capacity_bytes</code>，包括<code>old+humongous</code></td>
 </tr>
 </tbody></table>
-<h2 id="收集过程"><a href="#收集过程" class="headerlink" title="收集过程"></a>收集过程</h2><h3 id="Young-GC"><a href="#Young-GC" class="headerlink" title="Young GC"></a>Young GC</h3><p><code>STW</code></p>
-<p>主要是对<code>Eden</code>区进行<code>GC</code>，它在<code>Eden</code>空间耗尽时会被触发。</p>
+<h2 id="收集过程"><a href="#收集过程" class="headerlink" title="收集过程"></a>收集过程</h2><p>首先看下Oracle（java的爸爸）对G1 GC的简述：</p>
+<blockquote>
+<p>引自：<a href="https://docs.oracle.com/javase/9/gctuning/garbage-first-garbage-collector.htm#JSGCT-GUID-F1BE86FA-3EDC-4D4F-BDB4-4B044AD83180" target="_blank" rel="noopener">Garbage-First Garbage Collector</a></p>
+<p>​    On a high level, the G1 collector alternates between two phases. The young-only phase contains garbage collections that fill up the currently available memory with objects in the old generation gradually. The space-reclamation phase is where G1 reclaims space in the old generation incrementally, in addition to handling the young generation. Then the cycle restarts with a young-only phase.</p>
+<p>​    Figure 9-2 gives an overview about this cycle with an example of the sequence of garbage collection pauses that could occur:</p>
+<p><img src="http://qd2x6jysb.bkt.clouddn.com/image-20200729031629178.png" alt="image-20200729031629178"></p>
+<p>The following list describes the phases, their pauses and the transition between the phases of the G1 garbage collection cycle in detail:</p>
+<ol>
+<li>Young-only phase: This phase starts with a few young-only collections that promote objects into the old generation. The transition between the young-only phase and the space-reclamation phase starts when the old generation occupancy reaches a certain threshold, the Initiating Heap Occupancy threshold. At this time, G1 schedules an Initial Mark young-only collection instead of a regular young-only collection.<ul>
+<li>Initial Mark : This type of collection starts the marking process in addition to performing a regular young-only collection. Concurrent marking determines all currently reachable (live) objects in the old generation regions to be kept for the following space-reclamation phase. While marking hasn’t completely finished, regular young collections may occur. Marking finishes with two special stop-the-world pauses: Remark and Cleanup.</li>
+<li>Remark: This pause finalizes the marking itself, and performs global reference processing and class unloading. Between Remark and Cleanup G1 calculates a summary of the liveness information concurrently, which will be finalized and used in the Cleanup pause to update internal data structures.</li>
+<li>Cleanup: This pause also reclaims completely empty regions, and determines whether a space-reclamation phase will actually follow. If a space-reclamation phase follows, the young-only phase completes with a single young-only collection.</li>
+</ul>
+</li>
+<li>Space-reclamation phase: This phase consists of multiple mixed collections that in addition to young generation regions, also evacuate live objects of sets of old generation regions. The space-reclamation phase ends when G1 determines that evacuating more old generation regions wouldn’t yield enough free space worth the effort.</li>
+</ol>
+<p>After space-reclamation, the collection cycle restarts with another young-only phase. As backup, if the application runs out of memory while gathering liveness information, G1 performs an in-place stop-the-world full heap compaction (Full GC) like other collectors.</p>
+<p>文中的space-reclamation应该指的是下文中的<strong>混合GC</strong>。这点英文应该不用详细翻译了吧 :-)</p>
+</blockquote>
+<h3 id="Young-GC"><a href="#Young-GC" class="headerlink" title="Young GC"></a>Young GC</h3><p><code>STW</code></p>
+<p>主要是对<code>Eden</code>区进行<code>GC</code>，它在<code>Eden</code>空间耗尽时会被触发。（先判断是否需要进行并发标记）</p>
 <p>在这种情况下，<code>Eden</code>空间的数据移动到<code>Survivor</code>空间中，如果<code>Survivor</code>空间不够，<code>Eden</code>空间的部分数据会直接晋升到年老代空间。<code>Survivor</code>区的数据移动到新的<code>Survivor</code>区中，也有部分数据晋升到老年代空间中。</p>
 <p>最终<code>Eden</code>空间的数据为空，<code>GC</code>停止工作，应用线程继续执行。</p>
 <blockquote>
@@ -292,18 +416,27 @@
 <p>这是不必要的，原因在于每次GC时，所有新生代都会被扫描，所以只需要记录老年代到新生代之间的引用即可。</p>
 <p>参考：<a href="https://www.cnblogs.com/ASPNET2008/p/6496481.html" target="_blank" rel="noopener">https://www.cnblogs.com/ASPNET2008/p/6496481.html</a></p>
 </blockquote>
+<p><img src="http://qd2x6jysb.bkt.clouddn.com/image-20200729210319422.png" alt="image-20200729210319422"></p>
 <ul>
 <li><p><strong>根（Root Scan）扫描</strong>：</p>
 <p>静态和本地对象被扫描；</p>
+<p>如果对象还没有设置过标记信息，把对象从<code>Eden</code>复制到<code>Survivor</code>，然后针对对象的每一个<code>field</code>：</p>
+<ul>
+<li>如果<code>field</code>所引用的分区在<code>CSet</code>，则把对象的地址加入到<code>G1ParScanThreadState</code>（PSS）的队列中待扫描处理；</li>
+<li>如果字段不在<code>CSet</code>，则更新该对象所在堆分区对应的<code>RSet</code>。</li>
+</ul>
 </li>
-<li><p><strong>更新<code>RSet</code></strong>：</p>
-<p>处理<code>dirty card Queue</code>更新<code>RS</code>；</p>
-</li>
-<li><p><strong>处理<code>RSet</code>：</strong></p>
-<p>检测从年轻代指向年老代的对象；</p>
+<li><p><strong>处理<code>RSet</code></strong>：（更新、扫描<code>RSet</code>）</p>
+<ul>
+<li>处理<code>Dirty Card</code>，更新<code>RSet</code>，更新老生代分区到新生代分区的引用；</li>
+<li>扫描<code>RSet</code>，把引用者作为根，从根出发，对可达对象进行根扫描处理；</li>
+</ul>
 </li>
 <li><p><strong>对象拷贝：</strong></p>
 <p>拷贝存活的对象到<code>survivor/old</code>区域；</p>
+<p>在<code>PSS</code>中队列的对象都是活跃对象，每一个对象都要复制到<code>Survivor</code>区，然后针对该对象的每一个字段：</p>
+<p>如果字段所引用的分区在<code>CSet</code>，则把对象的地址加入到<code>G1ParScanThreadState</code>（<code>PSS</code>）的队列中待扫描处理；</p>
+<p>循环直到队列中没有对象。</p>
 </li>
 <li><p><strong>处理引用队列</strong>：</p>
 <p>软引用，弱引用，虚引用处理；</p>
@@ -311,6 +444,7 @@
 </ul>
 <h3 id="Global-concurrent-marking"><a href="#Global-concurrent-marking" class="headerlink" title="Global concurrent marking"></a>Global concurrent marking</h3><p>并发标记使用了一个叫<strong><code>Snapshot-At-The-Beginning</code>/<code>SATB</code></strong>的方法在标记阶段的开始来标记所有存活的对象。</p>
 <h4 id="那么什么时候会启动并发标记周期呢（Global-concurrent-marking）？"><a href="#那么什么时候会启动并发标记周期呢（Global-concurrent-marking）？" class="headerlink" title="那么什么时候会启动并发标记周期呢（Global concurrent marking）？"></a>那么什么时候会启动并发标记周期呢（Global concurrent marking）？</h4><p>这个是通过参数控制的，（<code>-XX:InitiatingHeapOccupancyPercent = 45</code>）此参数默认值是 45，也就是说当堆空间使用了 <code>45%</code> 后，G1 就会进入并发标记周期。</p>
+<p><img src="http://qd2x6jysb.bkt.clouddn.com/image-20200729235719090.png" alt="image-20200729235719090"></p>
 <p><img src="http://qd2x6jysb.bkt.clouddn.com/image-20200727144936253.png" alt="image-20200727144936253"></p>
 <h4 id="初始标记（Initial-Marking）"><a href="#初始标记（Initial-Marking）" class="headerlink" title="初始标记（Initial Marking）"></a>初始标记（Initial Marking）</h4><p><strong>需要<code>STW</code>。</strong></p>
 <p>仅仅是为了<strong>标记<code>GC roots</code>能关联到的对象</strong>，并且<strong>修改<code>TAMS（Top At Mark Start）</code>的值，让下一阶段用户程序并发执行时，能在正确可用的<code>Region</code>中创建新对象</strong>。</p>
@@ -343,6 +477,29 @@
 <p><strong>为什么要放两个 TAMS 指针和 bitmap 呢？</strong></p>
 <p>猜测可能是因为 G1GC 的 Evacuation 并不一定等待 Mark 阶段结束才开始，在 Concurrent Mark 期间也可能进入 Evacuation 阶段，这时会选用 prevTAMS 和 prevBitmap 做为标记信息，它们扮演了一个快照，能回收掉上一轮标记时发现的垃圾对象，在 Concurrent Mark 完成之后再进入 Evacuation 阶段的话，再取当前的 nextTAMS 和 nextBitmap。</p>
 </blockquote>
+<p><code>prevTAMS</code>和<code>nextTAMS</code>：</p>
+<blockquote>
+<p>用<code>Prev</code>指针指向上一次并发处理后的地址，用<code>Next</code>指向并发标记开始之前内存已经分配成功的地址。</p>
+<p>当并发标记开始之后，如果有新的对象分配，可以<strong>移动Top</strong>指针，使Top指针指向当前内存分配成功的地址。</p>
+<p><strong>Next指针</strong>和<strong>Top指针</strong>之间的地址就是<code>Mutator</code>新增的对象使用的地址。</p>
+<p>如果我们假设Prev指针之前的对象已经标记成功，在并发标记的时候从根出发，不仅仅标记Prev和Next之间的对象，还标记了Prev指针之前活跃的对象。</p>
+<p><strong>当并发标记结束之后，只需要把Prev指针设置为Next指针即可开始新一轮的标记处理。</strong></p>
+</blockquote>
+<p><code>PrevBitMap</code>和<code>NextBitMap</code>：</p>
+<blockquote>
+<p>引入两个额外的数据结构来记录内存标记的状态，典型的是使用位图来指示哪块内存已经使用，哪块内存还未使用。</p>
+<p>所以并发标记引入两个位图<code>PrevBitMap</code>和<code>NextBitMap</code>，用<code>PrevBitmap</code>记录<code>prev指针</code>之前内存的标记状况，用<code>NextBitmap</code>来表示整个内存到<code>next指针</code>之前的标记状态。</p>
+<p><strong>NextBitmap包含了整个使用内存的标记状态，为什么要引入PrevBitmap这个数据结构？</strong></p>
+<p>如果并发标记每次都成功，我们确实可以不需要<code>PrevBitmap</code>，只需要根据这个<code>BitMap</code>对对象进行清除即可。</p>
+<p>但是如果发生标记失败将丢失上一次对<code>Prev指针</code>之前所有内存的标记状况。</p>
+<ul>
+<li>在第一次标记时<code>PrevBitmap</code>为空，<code>NextBitmap</code>待标记；</li>
+<li>并发标记结束后，NextBitmap标记了分区对象存活的情况，如图所示。假定图中的位图中黑色区域表示堆分区中对应的对象还活着。在并发标记的同时Mutator继续运行，所以Top会继续增长；</li>
+<li>新一轮的并发标记开始，交换位图，重置指针。</li>
+</ul>
+</blockquote>
+<p>|<img src="http://qd2x6jysb.bkt.clouddn.com/image-20200729231321811.png" width="40%">|<img src="http://qd2x6jysb.bkt.clouddn.com/image-20200729231356443.png" width="40%" ></p>
+<p>|<img src="http://qd2x6jysb.bkt.clouddn.com/image-20200729231751967.png" width="40%">|<img src="http://qd2x6jysb.bkt.clouddn.com/image-20200729231853642.png" width="40%"></p>
 <h4 id="根区域扫描（Root-Region-Scan）"><a href="#根区域扫描（Root-Region-Scan）" class="headerlink" title="根区域扫描（Root Region Scan）"></a>根区域扫描（Root Region Scan）</h4><p>扫描整个<code>old区</code>所有<code>region</code>，看看<code>region</code>的<code>RSet</code>中是否含有其他地方的引用。</p>
 <figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">1.362: [GC concurrent-root-region-scan-start]</span><br><span class="line">1.364: [GC concurrent-root-region-scan-end, 0.0028513 secs]</span><br></pre></td></tr></table></figure>
 
@@ -351,20 +508,38 @@
 <p>该阶段的操作为遍历<code>Old Region</code>查询<code>Rset</code>是否有来自<code>RootRegion</code>的（<code>RootRegion</code>是初始标记得到的）。</p>
 <h4 id="并发标记（Concurrent-Marking）"><a href="#并发标记（Concurrent-Marking）" class="headerlink" title="并发标记（Concurrent Marking）"></a>并发标记（Concurrent Marking）</h4><p><strong>缩小遍历范围。</strong></p>
 <p>从<code>GC roots</code>开始对堆中的对象进行可达性分析，找出存活对象，可以和用户线程并发执行。</p>
-<p>当对象扫描完成后，并发时用户线程可能会有引用变动的对象，这些对象有可能会<strong>漏标（G1中使用SATB解决）</strong></p>
+<p>当对象扫描完成后，并发时用户线程可能会有引用变动的对象，这些对象有可能会<strong>漏标和错标（G1中使用SATB解决）</strong></p>
+<blockquote>
+<p>R大：</p>
+<p>并发阶段。不断从扫描栈取出引用递归扫描整个堆里的对象图。每扫描到一个对象就会对其标记，并将其字段压入扫描栈。重复扫描过程直到扫描栈清空。过程中还会扫描SATB write barrier所记录下的引用。</p>
+<p>引自R大回复 <a href="https://hllvm-group.iteye.com/group/topic/44381" target="_blank" rel="noopener">请教G1算法的原理</a></p>
+</blockquote>
 <p>（标记方式：<code>三色标记</code>，后面会抽出一篇文章论述）</p>
 <figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">1.364: [GC concurrent-mark-start]</span><br><span class="line">1.645: [GC concurrent-mark-end, 0.2803470 secs]</span><br></pre></td></tr></table></figure>
 
 
 
 <h4 id="最终-重新标记（Final-Marking）"><a href="#最终-重新标记（Final-Marking）" class="headerlink" title="最终/重新标记（Final Marking）"></a>最终/重新标记（Final Marking）</h4><p><strong>使用<code>SATB</code>记录标记。会发生STW</strong></p>
-<p>为了修正在并发标记期间因用户程序继续运作而导致标记产生变动的那一部分标记记录，<br>虚拟机将这部分变化记录到线程<code>Remember Set Logs</code>中。<br>这个阶段需要把<code>Remember Set Logs</code>合并到<code>Remember Set</code>中，需要停顿线程，但是可以并行执行。</p>
+<p>为了修正在并发标记期间因用户程序继续运作而导致标记产生变动的那一部分标记记录，</p>
+<p>虚拟机将这部分变化记录到线程<code>Remember Set Logs</code>中。</p>
+<p>这个阶段需要把<code>Remember Set Logs</code>合并到<code>Remember Set</code>中，需要停顿线程，但是可以并行执行。</p>
+<blockquote>
+<p>R大：</p>
+<p>暂停阶段。在完成并发标记后，每个Java线程还会有一些剩下的SATB write barrier记录的引用尚未处理。这个阶段就负责把剩下的引用处理完。同时这个阶段也进行弱引用处理（reference processing）。</p>
+<p>引自R大回复 <a href="https://hllvm-group.iteye.com/group/topic/44381" target="_blank" rel="noopener">请教G1算法的原理</a></p>
+</blockquote>
+<blockquote>
+<p>RSet中写屏障的主要目的是为了标记引用关系；</p>
+<p>STAB中写屏障主要是为了保证并行标记的正确性，STAB主要记录的是目的对象修改之前的对象。</p>
+</blockquote>
 <p>用来处理并发阶段后遗留下少量的<code>SATB记录</code>（<strong>漏标</strong>）。</p>
 <figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">1.645: [GC remark 1.645: [Finalize Marking, 0.0009461 secs] </span><br><span class="line">1.646: [GC ref-proc, 0.0000417 secs] 1.646: [Unloading, 0.0011301 secs], 0.0074056 secs]</span><br><span class="line">[Times: user&#x3D;0.01 sys&#x3D;0.00, real&#x3D;0.01 secs]</span><br></pre></td></tr></table></figure>
 
 
 
-<h4 id="筛选清除（Live-Data-Counting-and-Cleanup）"><a href="#筛选清除（Live-Data-Counting-and-Cleanup）" class="headerlink" title="筛选清除（Live Data Counting and Cleanup）"></a>筛选清除（Live Data Counting and Cleanup）</h4><p>首先对各个<code>Regin</code>的回收价值和成本进行<code>排序</code>，根据用户的期望GC停顿时间来<code>制定回收计划</code>。<br>这个阶段也可以与用户线程并发执行，因为只回收一部分<code>Regin</code>，时间是可控的。</p>
+<h4 id="筛选清除（Live-Data-Counting-and-Cleanup）"><a href="#筛选清除（Live-Data-Counting-and-Cleanup）" class="headerlink" title="筛选清除（Live Data Counting and Cleanup）"></a>筛选清除（Live Data Counting and Cleanup）</h4><p>首先对各个<code>Regin</code>的回收价值和成本进行<code>排序</code>，根据用户的期望GC停顿时间来<code>制定回收计划</code>。</p>
+<p>这个阶段也可以与用户线程并发执行，因为只回收一部分<code>Regin</code>，时间是可控的。</p>
+<p>这阶段的任务包括：分区信息计数、额外处理、RSet清理等。</p>
 <blockquote>
 <p>暂停阶段。清点和重置标记状态。</p>
 <p>这个阶段有点像mark-sweep中的sweep阶段，不过不是在堆上sweep实际对象，而是在marking bitmap里统计每个region被标记为活的对象有多少。这个阶段如果发现完全没有活对象的region就会将其整体回收到可分配region列表中。（free list）</p>
@@ -395,6 +570,14 @@
 <p>译文：</p>
 <p>​    在适当的时候（如第3.4节所述），我们停止mutator线程并执行撤离暂停。 在这里，我们选择一个集合集区域，并通过将所有活动对象复制到堆中的其他位置来撤消区域，从而释放集合集区域。 存在疏散停顿以便进行压实：对象的移动对于突变者必须是原子的。 在真正的并发系统中，实现这种原子性成本很高，因此我们改为在增量STW期间移动对象。</p>
 </blockquote>
+<p><code>Evacuation</code>阶段是全暂停的。它负责把一部分region里的活对象拷贝到空region里去，然后回收原本的region的空间。</p>
+<p><code>Evacuation</code>阶段可以自由选择任意多个region来独立收集构成收集集合（collection set，简称CSet），靠<code>per-region remembered set</code>（简称RSet）实现。这是<code>regional garbage collector</code>的特征。</p>
+<p>在选定<code>CSet</code>后，<code>evacuation</code>其实就跟<code>ParallelScavenge</code>的<code>young GC</code>的算法类似，采用<code>并行copying</code>（或者叫<code>scavenging</code>）算法把<code>CSet</code>里每个<code>region</code>里的活对象拷贝到新的<code>region</code>里，整个过程<strong>完全暂停</strong>。</p>
+<p>从这个意义上说，G1的<code>evacuation</code>跟传统的<code>mark-compact</code>算法的<code>compaction</code>完全不同：</p>
+<ul>
+<li>前者会自己从根集合遍历对象图来判定对象的生死，不需要依赖<code>global concurrent marking</code>的结果，有就用，没有拉倒；</li>
+<li>而后者则依赖于之前的mark阶段对对象生死的判定。</li>
+</ul>
 <h3 id="混合式垃圾收集"><a href="#混合式垃圾收集" class="headerlink" title="混合式垃圾收集"></a>混合式垃圾收集</h3><p><strong>并发垃圾回收</strong>周期结束后是混合垃圾回收周期，不仅进行年轻代垃圾收集，而且回收之前标记出来的老年代的垃圾最多的部分区块。</p>
 <p>混合垃圾回收周期会持续进行，直到几乎所有的被标记出来的分区（垃圾占比大的分区）都得到回收，然后恢复到常规的年轻代垃圾收集，最终再次启动并发周期。</p>
 <h3 id="Full-GC"><a href="#Full-GC" class="headerlink" title="Full GC"></a>Full GC</h3><p>导致Full GC的情况：</p>
@@ -433,6 +616,14 @@
 <p>这种情况下，应该避免分配大量的巨型对象，增加内存或者增大<code>-XX:G1HeapRegionSize</code>，使巨型对象不再是巨型对象。</p>
 </li>
 </ul>
+<p>注：</p>
+<p>其实，G1只有两个节点是并发执行的：</p>
+<ul>
+<li>全局并发标记（<code>Global concurrent marking</code>）；</li>
+<li>跨Region的引用记录到RSet中；</li>
+</ul>
+<p>而<code>evaluation</code>阶段却是<code>STW</code>的，那<strong>G1怎么做到低延迟的呢？</strong></p>
+<p>G1虽然会<code>mark</code>整个堆，但并不会疏散所有活对象所在的<code>Region</code>，它通过排序选择收益高的少许<code>Region</code>来疏散，但是这种疏散暂停可控（<code>Pause Prediction Model</code>）；</p>
 <h2 id="特点"><a href="#特点" class="headerlink" title="特点"></a>特点</h2><p><code>G1</code>跟踪各个<code>Region</code>里面的垃圾堆积的<strong>价值大小</strong>（回收所获得的空间大小以及回收所需时间经验值），在后台维护一个<strong>优先列表</strong>，每次根据允许的收集时间，优先回收价值最大的<code>Regin</code>。</p>
 <p>这种方式保证来<code>G1</code>收集器在有限时间内可以获取尽可能高的收集效率。</p>
 <h3 id="可预测停顿-amp-追求停顿时间"><a href="#可预测停顿-amp-追求停顿时间" class="headerlink" title="可预测停顿 &amp; 追求停顿时间"></a><strong>可预测停顿</strong> &amp; 追求停顿时间</h3><p>能够建立可以预测的停顿时间模型，预测停顿时间。</p>
@@ -491,7 +682,7 @@
 <p>在<code>G1 GC</code>过程中，每个可测量的步骤花费的时间都会记录到<code>TruncateSeq</code>（继承了<code>AbsSeq</code>）中，用来计算衰减均值、衰减变量，衰减标准偏差等。</p>
 <h3 id="跨代引用"><a href="#跨代引用" class="headerlink" title="跨代引用"></a>跨代引用</h3><p><img src="http://qd2x6jysb.bkt.clouddn.com/image-20200727152631049.png" alt="image-20200727152631049"></p>
 <h3 id="RSet（记忆集：Remember-Set）"><a href="#RSet（记忆集：Remember-Set）" class="headerlink" title="RSet（记忆集：Remember Set）"></a><strong>RSet（记忆集：Remember Set）</strong></h3><p>在G1中每个<code>Reigon</code>初始化时，会初始化一个<code>RSet</code>；</p>
-<p>用于<strong>记录/跟踪</strong>进入该区块的对象引用（如区块 A 中的对象引用了区块 B，区块 B 的 Rset 需要记录这个信息），它用于实现收集过程的并行化以及使得区块能进行独立收集。</p>
+<p>用于<strong>记录/跟踪</strong>进入该区块的对象引用（如区块 A 中的对象引用了区块 B，区块 B 的 Rset 需要记录这个信息），它用于实现收集过程的并行化以及使得区块能进行独立收集。（Remembered Set是在实现部分垃圾收集（partial GC）时用于记录从非收集部分指向收集部分的指针的<strong>集合</strong>的抽象数据结构。）</p>
 <p>总体上 <code>Remembered Sets</code>消耗的内存小于 <code>5%</code>。</p>
 <p>emmm, 来再看下大佬论文：</p>
 <blockquote>
@@ -513,6 +704,10 @@
 <p><strong>每个<code>Region</code>默认按照<code>512Kb</code>划分成多个<code>Card</code>，所以<code>RSet</code>需要记录的东西应该是 <code>xx Region</code>的<code>xx Card</code>。</strong></p>
 <p>（如下图：<code>Region1</code>和<code>Region3</code>中有对象引用了<code>Region2</code>的对象，则在<code>Region2</code>的<code>Rset</code>中记录了这些引用）</p>
 <p><img src="http://qd2x6jysb.bkt.clouddn.com/image-20200727201652054.png" alt="image-20200727201652054"></p>
+<h4 id="写屏障"><a href="#写屏障" class="headerlink" title="写屏障"></a>写屏障</h4><p>用来识别引用关系的变更。</p>
+<p><strong>写屏障</strong>是指在改变特定内存的值时（实际上也就是写入内存）额外执行的一些动作。</p>
+<h4 id="Post-Write-Barrier"><a href="#Post-Write-Barrier" class="headerlink" title="Post-Write Barrier"></a><code>Post-Write Barrier</code></h4><p>为了在应用程序<strong>运行期间</strong>维护<code>RSets</code>, 任何时候对引用的更新都会触发一个<code>Post-Write屏障</code>。如果关联的引用是跨region的，比如从一个<code>region</code>到另一个<code>region</code>，一个对应的记录也会在目标region的<code>RSet</code>中添加。 将记录（<code>cards</code>）加入到RSet是异步的并应用了很多优化。</p>
+<p>简单来说它用<code>Write</code>屏障来将脏记录放到本地<code>buffer</code>中， 一个特殊的GC线程会选择这些记录,然后传播信息给其他<code>region</code>的<code>RSet</code>。</p>
 <h4 id="Pre-Write-Barrier"><a href="#Pre-Write-Barrier" class="headerlink" title="Pre-Write Barrier"></a><code>Pre-Write Barrier</code></h4><blockquote>
 <p>原文：</p>
 <ul>
@@ -537,11 +732,37 @@
 <li><code>Mutator线程</code>将指针的先前值记录在<code>SATB缓冲区</code>中；</li>
 </ul>
 </blockquote>
-<p>上面提到的<code>Mutator thread</code>指的是：</p>
+<h4 id="管理RSet"><a href="#管理RSet" class="headerlink" title="管理RSet"></a>管理RSet</h4><p><code>G1</code>中使用<code>Refine</code>线程异步地维护和管理引用关系。因为要异步处理，所以必须有一个数据结构来维护这些需要引用的对象。</p>
+<p>JVM在设计的时候，声明了一个全局的静态变量<code>DirtyCardQueueSet</code>（<code>DCQS</code>），<code>DCQS</code>里面存放的是<code>DCQ</code>，为了性能的考虑，所有处理引用关系的线程共享一个<code>DCQS</code>，每个<code>Mutator</code>（线程）在初始化的时候都关联这个<code>DCQS</code>。</p>
+<p>每个<code>Mutator</code>都有一个私有的队列，每个队列的最大长度由<code>G1UpdateBufferSize</code>（默认值为256）确定，即最多存放256个引用关系对象，在本线程中如果产生新的对象引用关系则把引用者放入<code>DCQ</code>中，当满256个时，就会把这个队列放入到<code>DCQS</code>中（<code>DCQS</code>可以被所有线程共享，所以放入时需要加锁）。</p>
+<p><code>DCQS</code>的最大长度依赖于<code>Refine</code>线程的个数，最大为<code>Red Zone</code>的个数，当<code>DCQS</code>里面的队列个数超过<code>Red Zone</code>的个数时，提交队列的<code>Mutator</code>就不能把这个队列放入到<code>DCQS</code>中；</p>
 <h4 id="RSet实现过程"><a href="#RSet实现过程" class="headerlink" title="RSet实现过程"></a>RSet实现过程</h4><p>为了维护这些<code>RSet</code>，如果每次给引用类型的字段赋值都要更新<code>RSet</code>，这带来的额外开销实在太大，<code>G1</code>中采用<code>post-write barrier</code>和<code>concurrent refinement threads</code>实现了<code>RSet</code>的更新。</p>
 <figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">//假设对象young和old分别在不同的Region中</span></span><br><span class="line">Object young = <span class="keyword">new</span> Object();</span><br><span class="line">old.p = young;</span><br></pre></td></tr></table></figure>
 
 <p><code>Java</code>层面给<code>old对象</code>的p字段赋值<code>young对象</code>之后，<code>jvm底层</code>会执行<code>oop_store</code>方法，实现位于<code>oop.inline.hpp</code>类中。</p>
+<blockquote>
+<p>来自：《JVM G1源码分析和调优》 4.1 记忆集</p>
+<p>在线程运行过程中，如果对象的引用发生了变化（通常就是赋值操作），就必须要通知<code>RSet</code>，更改其中的记录，但对于一个分区来说，里面的对象有可能被很多分区所引用，这就要求这个分区记录所有引用者的信息。</p>
+<p>为此，G1使用了一种新的数据结构（<code>PRT</code>, <code>Per Region Table</code>）来记录这种变化，每个<code>Region</code>都包含了一个<code>PRT</code>，它是通过<code>HeapRegion</code>里面的一个结构<code>HeapRegionRemSet</code>获得，而<code>HeapRegionRemSet</code>包含了一个<code>OtherRegionsTable</code>，也就是我们所说的<code>PRT</code>：</p>
+<p><img src="http://qd2x6jysb.bkt.clouddn.com/image-20200729193220553.png" alt="image-20200729193220553"></p>
+<p><img src="http://qd2x6jysb.bkt.clouddn.com/image-20200729183730816.png" alt="image-20200729183730816"></p>
+<p>如图是<code>G1</code>中关于<code>RSet</code>和<code>卡表</code>的整体概述。</p>
+<p>卡表是一个全局表，这个卡表的作用并不是记录引用关系，而是记录该区域中对象垃圾回收过程中的状态信息，且能描述对象所处的内存区域块，它能快速描述内存的使用情况。</p>
+<p><code>RSet</code>里面有足够的信息定位到引用对象所在分区的块中。</p>
+<p>在G1回收器里面，使用了<code>Point-In</code>的方法。算法可以简化为找到需要收集的分区<code>HeapRegion</code>集合，所以<code>YGC</code>扫描<code>Root Set</code>和<code>RSet</code>就可以了。</p>
+<p><img src="http://qd2x6jysb.bkt.clouddn.com/image-20200729194800632.png" alt="image-20200729194800632"></p>
+<p><code>OtherRegionsTable</code>使用了三种不同的粒度来描述引用，如图所示。</p>
+<p>原因是前面提到的Point-In的缺点，<strong>一个对象可能被引用的次数不固定</strong>。</p>
+<p>引用的次数可能很多也可能很少，为了提高效率，才用了动态化的数据结构存储。</p>
+<p>主要有以下三种粒度：</p>
+<ul>
+<li>稀疏PRT：通过哈希表方式来存储。默认长度为4。</li>
+<li>细粒度PRT：通过PRT指针的指针，所以可以简单地理解为PRT指针的数组。其数组长度可以指定也可以自动计算得到。</li>
+<li>粗粒度：通过位图来指示，每一位表示对应的分区有引用到该分区数据结构。</li>
+</ul>
+<p>在<strong>细粒度表</strong>中，每一项都是<strong>PRT</strong>，这个<code>PRT</code>使用的是<code>HeapRegion</code>的<strong>起始地址</strong>加上<strong>一个位图</strong>，这个位图<strong>描述这一个分区的引用情况</strong>，所以它的大小为<code>HeapRegionSize%512</code>。</p>
+<p>不直接记录地址而是通过一个起始地址和位图，这样可以使用更少的内存存储更多的引用关系。</p>
+</blockquote>
 <blockquote>
 <p>节选自：《Garbage-First Garbage Collection》</p>
 <p>2.2    Remembered Set Maintenance</p>
@@ -552,7 +773,7 @@
 <p>​    We use only a single concurrent remembered set thread, to introduce parallelism when idle processors exist. However, if this thread is not sufficient to service the rate of mutation, the  filled RS buffer set will grow too large.  We limit the size of this set; mutator threads attempting to add further buffers perform the remembered set processing themselves.</p>
 <p>译文：</p>
 <p>…如果该条目已经被标记（<code>dirty</code>），则不执行任何操作。 这减少了多个存储到同一个<code>card</code>的工作，这是常见的情况，因为初始化了写操作。 如果<code>card Table</code>的<code>entry节点</code>没有标记，则进行标记，并将指向该card的指针<code>enqueued</code>到线程的<code>RSets Log</code>中。 如果此队列填充了<code>当前线程的日志缓冲区</code>（默认情况下包含256个元素），则将该缓冲区放入<code>全局填充缓冲区</code>集中，并分配一个新的空缓冲区。</p>
-<p>​    并发的<code>RSets</code>线程（在条件变量上）等待已填充的<code>RS buffer Set</code>的大小达到可配置的初始化阈值（默认为5个缓冲区）。<code>RSet</code>线程将已填充的缓冲区作为<code>队列</code>进行处理，直到队列的长度减少到启动阈值的1/4。对于每个缓冲区，它处理每个<code>Card Table</code>的 <code>pointer entry</code>。一些<code>card</code>很热（操作频繁），它们包含经常写入的位置。<strong>为避免重复处理热card</strong>，我们尝试识别最热的卡，然后将其处理推迟到下一个<code>疏散暂停</code>时（有关疏散暂停的说明，请参阅第2.3节）。我们用第二个<code>Card Table</code>完成此操作，该表记录了自上次疏散暂停以来卡片被标记的次数（在此期间，该表（如卡片表一样）被清除了）。处理card时，我们会在此表中增加其数量。如果计数超过热点阈值（默认值为4），则将卡添加到称为热Queue（默认大小为1 K）的循环缓冲区。在每个疏散暂停开始时，该队列都像日志缓冲区一样进行处理，因此在结束时为空。如果循环缓冲区已满，则从另一端收回card并进行处理。</p>
+<p>​    并发的<code>RSets</code>线程（在条件变量上）等待已填充的<code>RS buffer Set</code>的大小达到可配置的初始化阈值（默认为5个缓冲区）。<code>RSet</code>线程将已填充的缓冲区作为<code>队列</code>进行处理，直到队列的长度减少到启动阈值的1/4。对于每个缓冲区，它处理每个<code>Card Table</code>的 <code>pointer entry</code>。一些<code>card</code>很热（操作频繁），它们包含经常写入的位置。<strong>为避免重复处理热card</strong>，我们尝试识别最热的卡，然后将其处理推迟到下一个<code>疏散暂停</code>时（有关疏散暂停的说明，请参阅第2.3节）。我们用第二个<code>Card Table</code>完成此操作，该表记录了自上次疏散暂停以来卡片被标记的次数（在此期间，该表（如卡片表一样）被清除了）。处理card时，我们会在此表中增加其数量。如果计数超过热点阈值（默认值为4），则将card添加到称为热Queue（默认大小为1 K）的循环缓冲区。在每个疏散暂停开始时，该队列都像日志缓冲区一样进行处理，因此在结束时为空。如果循环缓冲区已满，则从另一端收回card并进行处理。</p>
 <p>​    因此，如果并发RSet线程尚未达到热度阈值，或者从热Queue中驱逐，则该进程会处理该Card。 为了处理Card，线程rst会将相应的Card Table Entry重置为净值，以便对Card上的对象进行的任何并发修改都将重新标记Card。 然后，它检查所有对象的指针字段，这些对象的修改可能会使卡被标记，寻找包含堆区之外的指针。 如果找到了这样的指针，则将Card插入到所记住的被引用Region中。</p>
 <p>​    当空闲处理器存在时，我们仅使用一个并发RSet线程来引入并行性。 但是，如果此线程不足以服务于突变率，则已填充的RS buffer set将变得太大。 我们限制这个集合的大小； 试图添加更多缓冲区的mutator线程自己处理RSet。</p>
 </blockquote>
@@ -564,7 +785,7 @@
 <li>如果当前是应用线程，每个Java线程有一个<code>dirty card queue</code>，把该<code>card</code>插入队列；</li>
 <li>除了每个线程自带的<code>dirty card queue</code>，还有一个全局共享的<code>queue</code>；</li>
 </ol>
-<h5 id="修改"><a href="#修改" class="headerlink" title="修改"></a><strong>修改</strong></h5><p><code>RSet</code>更新操作交由多个<code>ConcurrentG1RefineThread</code>并发完成，每当全局队列集合超过一定阈后，<code>ConcurrentG1RefineThread</code>会取出若干个队列，遍历每个队列中记录的<code>card</code>，并进行处理，位于<code>G1RemSet::refine_card</code>方法，大概实现逻辑如下：</p>
+<h5 id="修改"><a href="#修改" class="headerlink" title="修改"></a><strong>修改</strong></h5><p><code>RSet</code>更新操作交由多个<code>ConcurrentG1RefineThread</code>并发完成，每当全局队列（DCQS）集合超过一定阈后，<code>ConcurrentG1RefineThread</code>会取出若干个队列，遍历每个队列中记录的<code>card</code>，并进行处理，位于<code>G1RemSet::refine_card</code>方法，大概实现逻辑如下：</p>
 <ol>
 <li>根据<code>card</code>的地址，计算出<code>card</code>所在的<code>Region</code>；</li>
 <li>如果<code>Region</code>不存在，或者<code>Region</code>是<code>Young</code>区，或者该<code>Region</code>在回收集合中，则不进行处理；</li>
@@ -573,23 +794,43 @@
 <p><img src="http://qd2x6jysb.bkt.clouddn.com/image-20200727211125384.png" alt="image-20200727211125384"></p>
 <h3 id="Collection-Set（增量解决问题：CSet）"><a href="#Collection-Set（增量解决问题：CSet）" class="headerlink" title="Collection Set（增量解决问题：CSet）"></a>Collection Set（增量解决问题：CSet）</h3><p>它记录了<code>GC</code>要收集的<code>Region</code>集合，集合里的<code>Region</code>可以是任意年代的。</p>
 <p>在<code>GC</code>的时候，对于<code>old-&gt;young</code>和<code>old-&gt;old</code>的跨代对象引用，只要扫描对应的<code>CSet</code>中的<code>RSet</code>即可，同时，在这些区块中的对象会被复制到其他区块中，总体上 <code>Collection Sets</code> 消耗的内存小于 <code>1%</code>。</p>
-<h3 id="CardTable（记录扫描跨代引用内存区域）"><a href="#CardTable（记录扫描跨代引用内存区域）" class="headerlink" title="CardTable（记录扫描跨代引用内存区域）"></a><strong>CardTable（记录扫描跨代引用内存区域）</strong></h3><p>由于<code>新生代GC</code>时，需要扫描整个<code>Old区</code>，效率很低。同时，倘若引用的对象很多，赋值器需要对每个引用做处理，赋值器开销会很大，为了解决赋值器开销这个问题，在G1 中又引入了另外一个概念，卡表（<code>Card Table</code>）。</p>
+<h3 id="CardTable（记录扫描跨代引用内存区域）"><a href="#CardTable（记录扫描跨代引用内存区域）" class="headerlink" title="CardTable（记录扫描跨代引用内存区域）"></a><strong>CardTable（记录扫描跨代引用内存区域）</strong></h3><p><strong>是RSet的实现方式，使用字节数组来实现card的记录，每个card对应该数组里的一个bit或一个byte。</strong></p>
+<p>由于<code>新生代GC</code>时，需要扫描整个<code>Old区</code>，效率很低。同时，倘若引用的对象很多，赋值器需要对每个引用做处理，赋值器开销会很大，为了解决赋值器开销这个问题，在G1 中又引入了另外一个概念，卡表（<code>Card Table</code>）。</p>
 <p>一个<code>Card Table</code>将一个分区在逻辑上划分为固定大小的连续区域，每个区域称之为卡。卡通常较小，介于<code>128到512字节</code>之间。<code>Card Table</code>通常为<strong>字节数组</strong>，由<code>Card</code>的索引（即数组下标）来标识每个分区的空间地址。</p>
 <p>默认情况下，每个卡Card都未被引用。当一个地址空间被引用时，标记为<strong>脏被引用</strong>，此外RSet也将这个数组下标记录下来。</p>
 <p><strong>一般情况下，这个RSet其实是一个<code>Hash Table</code>，<code>Key</code>是别的<code>Region</code>的起始地址，<code>Value</code>是一个集合，里面的元素是<code>Card Table</code>的<code>Index</code>。</strong></p>
 <p><img src="http://qd2x6jysb.bkt.clouddn.com/image-20200727153252300.png" alt="image-20200727153252300"></p>
-<p>下面举个例子：</p>
-<blockquote>
-<p>有两个分区，假设分区大小都为1MB，分别为A和B。如果A中有一个对象objA，B中有一个对象objB，且objA.field=objB，那么这两个分区就有引用关系了，但是如果我们想找到分区A，要如何引用分区B？</p>
-</blockquote>
-<p>借助额外的数据结构描述这种引用关系，例如使用类似<strong>位图</strong>（<code>bitmap</code>）的方法，记录A和B的内存块之间的引用关系，用一个位来描述一个字，假设在32位机器上（一个字为32位），需要<code>32KB</code>（<code>32KB×32=1M</code>）的空间来描述一个分区。</p>
-<p>那么我们就可以在这个<code>对象ObjA</code>所在<code>分区A</code>里面添加一个额外的指针，这个指针<strong>指向另外一个<code>分区B</code>的位图</strong>，如果我们可以把<code>对象ObjA</code>和指针关系进行映射，那么当访问<code>ObjA</code>的时候，顺便访问这个额外的指针，从这个指针指向的位图就能找到被<code>ObjA</code>引用的<code>分区B</code>对应的内存块。</p>
-<p>通常我们只需要判定位图里面对应的位是否有1，有的话则认为发生了引用。</p>
-<p><strong>局限性：</strong></p>
-<p><strong>以位为粒度的位图能准确描述每一个字的引用关系，但是一个位通常包含的信息太少，只能描述2个状态：引用还是未引用。实际应用中JVM在垃圾回收的时候需要更多的状态，如果增加至一个字节来描述状态，则位图需要256KB的空间，这个数字太大，开销占了25%。</strong></p>
-<p>所以一个可能的做法位图不再描述一个字，而是一个区域，JVM选择<code>512字节</code>为单位，即用<code>一个字节</code>描述<code>512字节</code>的引用关系。</p>
-<p>选择一个区域除了空间利用率的问题之外，实际上还有现实的意义。我们知道Java对象实际上不是一个字能描述的（有一个参数可以控制对象最小对齐的大小，默认是8字节，实际上Java在JVM中还有一些附加信息，所以对齐后最小的Java对象是16字节），很多Java对象可能是几十个字节或者几百个字节，所以<strong>用一个字节描述一个区域是有意义的</strong>。</p>
+<p>来个浅显易懂的总结：</p>
+<p><img src="http://qd2x6jysb.bkt.clouddn.com/image-20200729144633310.png" alt="image-20200729144633310"></p>
+<p><code>cardtable</code>实际上是一个bit 数组, 标记了<code>GEN1</code>内存（比如分为1个4KB为单位的block）， 如果bit位被置位1（表示为红色）那就说明这个范围的内存是<code>Dirty</code>的（含有对更年轻对象的引用）。有了这个<code>table</code>后，我们在做<code>GC</code>时, 不止考虑<code>GEN0</code>的<code>GCROOTS</code>, 那些<code>CardTable</code> 中<code>Dirty block</code>中的所有对象都被认为是<code>GCROOTS</code>。</p>
 <p><strong><code>RSet</code>和<code>CardTable</code>用来避免<code>YoungGC</code>全部扫描老年代对象。</strong></p>
+<h3 id="Refine线程"><a href="#Refine线程" class="headerlink" title="Refine线程"></a>Refine线程</h3><p><code>Refine</code>线程是G1新引入的并发线程池，线程默认数目为<code>G1ConcRefinementThreads+1</code>，它分为两大功能：</p>
+<ul>
+<li><p>用于处理新生代分区的抽样，并且在满足响应时间的这个指标下，更新<code>YHR</code>（Young Heap Region）的数目。通常有一个线程来处理。</p>
+</li>
+<li><p>管理<code>RSet</code>，这是<code>Refine</code>最主要的功能。</p>
+<p><code>RSet</code>的更新并不是同步完成的：</p>
+<ol>
+<li>G1会把所有的引用关系都先放入到一个队列中，称为<code>dirty card queue</code>（<code>DCQ</code>）；</li>
+<li>然后使用线程来消费这个队列以完成更新。</li>
+</ol>
+<p>正常来说有<code>G1ConcRefinementThreads</code>个线程处理；</p>
+<p>实际上除了<code>Refine</code>线程更新<code>RSet</code>之外，GC线程或者<code>Mutator</code>也可能会更新<code>RSet</code>；</p>
+<p><code>DCQ</code>通过<code>Dirty Card Queue Set</code>（<code>DCQS</code>）来管理；</p>
+<p>为了能够并发地处理，每个<code>Refine</code>线程只负责<code>DCQS</code>中的某几个<code>DCQ</code>。</p>
+</li>
+</ul>
+<h4 id="工作原理"><a href="#工作原理" class="headerlink" title="工作原理"></a>工作原理</h4><p><code>Refine</code>线程的初始化是在GC管理器初始化的时候进行，但是如果没有足够多的引用关系变更，这些Refine线程都是空转，所以需要一个机制能动态激活和冻结线程，JVM通过wait和notify机制来实现。</p>
+<p><strong>设计思想</strong>：</p>
+<p>从<code>0到n-1</code>线程（n表示<code>Refine</code>线程的个数），都是由前一个线程发现自己太忙，激活后一个；</p>
+<p>后一个线程发现自己太闲的时候则主动冻结自己。</p>
+<p><strong>那么第0个线程在何时被激活？</strong></p>
+<p>第0个线程是由正在运行的<code>Java</code>线程来激活的，当Java线程（<code>Mutator</code>）尝试把修改的引用放入到队列时，如果0号线程还没激活，则发送<code>notify</code>信号激活它。所以在设计的时候，0号线程可能会由任意一个<code>Mutator</code>来通知，而1号到n-1号线程只能有前一个标号的<code>Refine</code>线程通知。因为0号线程可以由任意<code>Mutator</code>通知，所以0号线程等待的<code>Monitor</code>是一个全局变量，而1号到n-1号线程中的<code>Monitor</code>则是局部变量。</p>
+<h4 id="抽样线程"><a href="#抽样线程" class="headerlink" title="抽样线程"></a>抽样线程</h4><p>Refine线程池中的最后一个线程就是抽样线程，它的主要作用是设置新生代分区的个数，使G1满足垃圾回收的预测停顿时间。</p>
+<p>修正新生代分区数目的具体的计算方式在<code>update_young_list_target_length</code>，传递的参数就是我们采样得到的分区数目，使用的方法就是<code>G1停顿预测模型</code>预测出的值，在预测时，还需要考虑最小分区的下限和上限。</p>
+<blockquote>
+<p>其余关于Refine线程和DCQS相关的白、绿、黄、红区自己看吧（《JVM G1源码分析和调优》4.3 Refinement Zone）</p>
+</blockquote>
 <h2 id="缺陷"><a href="#缺陷" class="headerlink" title="缺陷"></a>缺陷</h2><ul>
 <li><p><code>G1</code> 需要记忆集<code>RSets</code> （具体来说是卡表）来记录新生代和老年代之间的引用关系，这种数据结构在 G1 中需要占用大量的内存，可能达到整个堆内存容量的 <code>20%</code> 甚至更多。</p>
 <p>而且 <code>G1</code> 中维护记忆集的成本较高，带来了更高的执行负载，影响效率。</p>
@@ -597,7 +838,14 @@
 <li><p>不适用小内存应用上，大内存使用更有优势（界限：<code>6~8GB</code>）</p>
 </li>
 </ul>
-<h2 id="调优"><a href="#调优" class="headerlink" title="调优"></a>调优</h2><h3 id="XX-MaxGCPauseMillis-200（建立G1停顿预测模型）"><a href="#XX-MaxGCPauseMillis-200（建立G1停顿预测模型）" class="headerlink" title="-XX:MaxGCPauseMillis=200（建立G1停顿预测模型）"></a><code>-XX:MaxGCPauseMillis=200</code>（建立G1停顿预测模型）</h3><p><strong>那<code>G1</code>是如何做到最大暂停时间的呢？</strong></p>
+<h2 id="调优"><a href="#调优" class="headerlink" title="调优"></a>调优</h2><blockquote>
+<p>推荐：<a href="https://docs.oracle.com/javase/9/gctuning/garbage-first-garbage-collector-tuning.htm#JSGCT-GUID-90E30ACA-8040-432E-B3A0-1E0440AB556A" target="_blank" rel="noopener">10 Garbage-First Garbage Collector Tuning</a>（来自Oracle的干货，没有之一）</p>
+</blockquote>
+<h3 id="XX-MaxGCPauseMillis-200（建立G1停顿预测模型）"><a href="#XX-MaxGCPauseMillis-200（建立G1停顿预测模型）" class="headerlink" title="-XX:MaxGCPauseMillis=200（建立G1停顿预测模型）"></a><code>-XX:MaxGCPauseMillis=200</code>（建立G1停顿预测模型）</h3><p><strong>提高吞吐量</strong></p>
+<blockquote>
+<p>​    If you prefer high throughput, then relax the pause-time goal by using <code>-XX:MaxGCPauseMillis</code> or provide a larger heap. If latency is the main requirement, then modify the pause-time target. <strong>Avoid limiting the young generation size to particular value</strong>s by using options like <code>-Xmn</code>, <code>-XX:NewRatio</code> and others because the young generation size is the main means for G1 to allow it to meet the pause-time. Setting the young generation size to a single value overrides and practically disables pause-time control.</p>
+</blockquote>
+<p><strong>那<code>G1</code>是如何做到最大暂停时间的呢？</strong></p>
 <p>这涉及到另一个概念，<code>CSet(collection set)</code>。</p>
 <p>它的意思是在一次垃圾收集器中被收集的区域集合。</p>
 <ul>
@@ -627,6 +875,8 @@
 <blockquote>
 <p>参考：</p>
 <p>《JVM G1源码分析和调优》</p>
+<p><a href="http://psy-lob-saw.blogspot.com/2014/10/the-jvm-write-barrier-card-marking.html" target="_blank" rel="noopener">The JVM Write Barrier - Card Marking</a></p>
+<p><a href="https://docs.oracle.com/javase/9/gctuning/garbage-first-garbage-collector-tuning.htm#JSGCT-GUID-90E30ACA-8040-432E-B3A0-1E0440AB556A" target="_blank" rel="noopener">10 Garbage-First Garbage Collector Tuning</a></p>
 <p><a href="https://www.eidos.ic.i.u-tokyo.ac.jp/~tau/lecture/programming_languages/presentations/2017/papers/p37-detlefs.pdf" target="_blank" rel="noopener">Garbage-First Garbage Collection（论文）</a></p>
 <p><a href="https://github.com/gaoxingliang/goodutils/blob/master/gc_handbook_zh.md" target="_blank" rel="noopener">GC_HANDBOOK_ZH.md</a></p>
 <p><a href="https://www.oracle.com/cn/technical-resources/articles/java/g1gc.html" target="_blank" rel="noopener">GC G1调优</a></p>
@@ -691,7 +941,7 @@
   <div class="post-catalog" id="catalog">
     <div class="title">目录</div>
     <div class="catalog-content">
-      <ol class="toc"><li class="toc-item toc-level-2"><a class="toc-link" href="#区别"><span class="toc-text">区别</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#内存划分"><span class="toc-text">内存划分</span></a><ol class="toc-child"><li class="toc-item toc-level-3"><a class="toc-link" href="#分区类型分为？"><span class="toc-text">分区类型分为？</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#Heap-Region大小确定方式？"><span class="toc-text">Heap Region大小确定方式？</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#如果G1是启发式推断新生代的大小，那么当新生代变化时该如何实现？"><span class="toc-text">如果G1是启发式推断新生代的大小，那么当新生代变化时该如何实现？</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#分配新的分区时，何时扩展？一次扩展多少内存？"><span class="toc-text">分配新的分区时，何时扩展？一次扩展多少内存？</span></a></li></ol></li><li class="toc-item toc-level-2"><a class="toc-link" href="#GC模式"><span class="toc-text">GC模式</span></a><ol class="toc-child"><li class="toc-item toc-level-3"><a class="toc-link" href="#参数配置"><span class="toc-text">参数配置</span></a></li></ol></li><li class="toc-item toc-level-2"><a class="toc-link" href="#收集过程"><span class="toc-text">收集过程</span></a><ol class="toc-child"><li class="toc-item toc-level-3"><a class="toc-link" href="#Young-GC"><span class="toc-text">Young GC</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#Global-concurrent-marking"><span class="toc-text">Global concurrent marking</span></a><ol class="toc-child"><li class="toc-item toc-level-4"><a class="toc-link" href="#那么什么时候会启动并发标记周期呢（Global-concurrent-marking）？"><span class="toc-text">那么什么时候会启动并发标记周期呢（Global concurrent marking）？</span></a></li><li class="toc-item toc-level-4"><a class="toc-link" href="#初始标记（Initial-Marking）"><span class="toc-text">初始标记（Initial Marking）</span></a><ol class="toc-child"><li class="toc-item toc-level-5"><a class="toc-link" href="#TAMS是什么？"><span class="toc-text">TAMS是什么？</span></a></li></ol></li><li class="toc-item toc-level-4"><a class="toc-link" href="#根区域扫描（Root-Region-Scan）"><span class="toc-text">根区域扫描（Root Region Scan）</span></a><ol class="toc-child"><li class="toc-item toc-level-5"><a class="toc-link" href="#作用？"><span class="toc-text">作用？</span></a></li></ol></li><li class="toc-item toc-level-4"><a class="toc-link" href="#并发标记（Concurrent-Marking）"><span class="toc-text">并发标记（Concurrent Marking）</span></a></li><li class="toc-item toc-level-4"><a class="toc-link" href="#最终-重新标记（Final-Marking）"><span class="toc-text">最终&#x2F;重新标记（Final Marking）</span></a></li><li class="toc-item toc-level-4"><a class="toc-link" href="#筛选清除（Live-Data-Counting-and-Cleanup）"><span class="toc-text">筛选清除（Live Data Counting and Cleanup）</span></a></li></ol></li><li class="toc-item toc-level-3"><a class="toc-link" href="#Evacuation（疏散暂停）"><span class="toc-text">Evacuation（疏散暂停）</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#混合式垃圾收集"><span class="toc-text">混合式垃圾收集</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#Full-GC"><span class="toc-text">Full GC</span></a></li></ol></li><li class="toc-item toc-level-2"><a class="toc-link" href="#特点"><span class="toc-text">特点</span></a><ol class="toc-child"><li class="toc-item toc-level-3"><a class="toc-link" href="#可预测停顿-amp-追求停顿时间"><span class="toc-text">可预测停顿 &amp; 追求停顿时间</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#并行与并发"><span class="toc-text">并行与并发</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#空间整合"><span class="toc-text">空间整合</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#分代收集"><span class="toc-text">分代收集</span></a></li></ol></li><li class="toc-item toc-level-2"><a class="toc-link" href="#技术细节"><span class="toc-text">技术细节</span></a><ol class="toc-child"><li class="toc-item toc-level-3"><a class="toc-link" href="#内存区域不固定"><span class="toc-text">内存区域不固定</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#G1停顿预测模型（Pause-Prediction-Model）"><span class="toc-text">G1停顿预测模型（Pause Prediction Model）</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#跨代引用"><span class="toc-text">跨代引用</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#RSet（记忆集：Remember-Set）"><span class="toc-text">RSet（记忆集：Remember Set）</span></a><ol class="toc-child"><li class="toc-item toc-level-4"><a class="toc-link" href="#Pre-Write-Barrier"><span class="toc-text">Pre-Write Barrier</span></a></li><li class="toc-item toc-level-4"><a class="toc-link" href="#RSet实现过程"><span class="toc-text">RSet实现过程</span></a><ol class="toc-child"><li class="toc-item toc-level-5"><a class="toc-link" href="#赋值"><span class="toc-text">赋值</span></a></li><li class="toc-item toc-level-5"><a class="toc-link" href="#修改"><span class="toc-text">修改</span></a></li></ol></li></ol></li><li class="toc-item toc-level-3"><a class="toc-link" href="#Collection-Set（增量解决问题：CSet）"><span class="toc-text">Collection Set（增量解决问题：CSet）</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#CardTable（记录扫描跨代引用内存区域）"><span class="toc-text">CardTable（记录扫描跨代引用内存区域）</span></a></li></ol></li><li class="toc-item toc-level-2"><a class="toc-link" href="#缺陷"><span class="toc-text">缺陷</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#调优"><span class="toc-text">调优</span></a><ol class="toc-child"><li class="toc-item toc-level-3"><a class="toc-link" href="#XX-MaxGCPauseMillis-200（建立G1停顿预测模型）"><span class="toc-text">-XX:MaxGCPauseMillis&#x3D;200（建立G1停顿预测模型）</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#XX-G1HeapRegionSize-n设置G1区域大小"><span class="toc-text">-XX:G1HeapRegionSize&#x3D;n设置G1区域大小</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#XX-ParallelGCThreads-n设置STW工作线程个数"><span class="toc-text">-XX:ParallelGCThreads&#x3D;n设置STW工作线程个数</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#XX-InitiatingHeapOccupancyPercent-45设置触发标记周期的堆占用率阀值"><span class="toc-text">-XX:InitiatingHeapOccupancyPercent&#x3D;45设置触发标记周期的堆占用率阀值</span></a></li></ol></li></ol>
+      <ol class="toc"><li class="toc-item toc-level-2"><a class="toc-link" href="#区别"><span class="toc-text">区别</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#内存划分"><span class="toc-text">内存划分</span></a><ol class="toc-child"><li class="toc-item toc-level-3"><a class="toc-link" href="#分区类型分为？"><span class="toc-text">分区类型分为？</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#Heap-Region大小确定方式？"><span class="toc-text">Heap Region大小确定方式？</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#如果G1是启发式推断新生代的大小，那么当新生代变化时该如何实现？"><span class="toc-text">如果G1是启发式推断新生代的大小，那么当新生代变化时该如何实现？</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#分配新的分区时，何时扩展？一次扩展多少内存？"><span class="toc-text">分配新的分区时，何时扩展？一次扩展多少内存？</span></a></li></ol></li><li class="toc-item toc-level-2"><a class="toc-link" href="#对象分配"><span class="toc-text">对象分配</span></a><ol class="toc-child"><li class="toc-item toc-level-3"><a class="toc-link" href="#主流程"><span class="toc-text">主流程</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#TLAB内存分配"><span class="toc-text">TLAB内存分配</span></a><ol class="toc-child"><li class="toc-item toc-level-4"><a class="toc-link" href="#快速无锁分配"><span class="toc-text">快速无锁分配</span></a></li><li class="toc-item toc-level-4"><a class="toc-link" href="#慢速分配"><span class="toc-text">慢速分配</span></a></li></ol></li><li class="toc-item toc-level-3"><a class="toc-link" href="#堆慢速内存分配"><span class="toc-text">堆慢速内存分配</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#大对象分配"><span class="toc-text">大对象分配</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#最后的分配尝试"><span class="toc-text">最后的分配尝试</span></a></li></ol></li><li class="toc-item toc-level-2"><a class="toc-link" href="#GC模式"><span class="toc-text">GC模式</span></a><ol class="toc-child"><li class="toc-item toc-level-3"><a class="toc-link" href="#参数配置"><span class="toc-text">参数配置</span></a></li></ol></li><li class="toc-item toc-level-2"><a class="toc-link" href="#收集过程"><span class="toc-text">收集过程</span></a><ol class="toc-child"><li class="toc-item toc-level-3"><a class="toc-link" href="#Young-GC"><span class="toc-text">Young GC</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#Global-concurrent-marking"><span class="toc-text">Global concurrent marking</span></a><ol class="toc-child"><li class="toc-item toc-level-4"><a class="toc-link" href="#那么什么时候会启动并发标记周期呢（Global-concurrent-marking）？"><span class="toc-text">那么什么时候会启动并发标记周期呢（Global concurrent marking）？</span></a></li><li class="toc-item toc-level-4"><a class="toc-link" href="#初始标记（Initial-Marking）"><span class="toc-text">初始标记（Initial Marking）</span></a><ol class="toc-child"><li class="toc-item toc-level-5"><a class="toc-link" href="#TAMS是什么？"><span class="toc-text">TAMS是什么？</span></a></li></ol></li><li class="toc-item toc-level-4"><a class="toc-link" href="#根区域扫描（Root-Region-Scan）"><span class="toc-text">根区域扫描（Root Region Scan）</span></a><ol class="toc-child"><li class="toc-item toc-level-5"><a class="toc-link" href="#作用？"><span class="toc-text">作用？</span></a></li></ol></li><li class="toc-item toc-level-4"><a class="toc-link" href="#并发标记（Concurrent-Marking）"><span class="toc-text">并发标记（Concurrent Marking）</span></a></li><li class="toc-item toc-level-4"><a class="toc-link" href="#最终-重新标记（Final-Marking）"><span class="toc-text">最终&#x2F;重新标记（Final Marking）</span></a></li><li class="toc-item toc-level-4"><a class="toc-link" href="#筛选清除（Live-Data-Counting-and-Cleanup）"><span class="toc-text">筛选清除（Live Data Counting and Cleanup）</span></a></li></ol></li><li class="toc-item toc-level-3"><a class="toc-link" href="#Evacuation（疏散暂停）"><span class="toc-text">Evacuation（疏散暂停）</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#混合式垃圾收集"><span class="toc-text">混合式垃圾收集</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#Full-GC"><span class="toc-text">Full GC</span></a></li></ol></li><li class="toc-item toc-level-2"><a class="toc-link" href="#特点"><span class="toc-text">特点</span></a><ol class="toc-child"><li class="toc-item toc-level-3"><a class="toc-link" href="#可预测停顿-amp-追求停顿时间"><span class="toc-text">可预测停顿 &amp; 追求停顿时间</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#并行与并发"><span class="toc-text">并行与并发</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#空间整合"><span class="toc-text">空间整合</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#分代收集"><span class="toc-text">分代收集</span></a></li></ol></li><li class="toc-item toc-level-2"><a class="toc-link" href="#技术细节"><span class="toc-text">技术细节</span></a><ol class="toc-child"><li class="toc-item toc-level-3"><a class="toc-link" href="#内存区域不固定"><span class="toc-text">内存区域不固定</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#G1停顿预测模型（Pause-Prediction-Model）"><span class="toc-text">G1停顿预测模型（Pause Prediction Model）</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#跨代引用"><span class="toc-text">跨代引用</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#RSet（记忆集：Remember-Set）"><span class="toc-text">RSet（记忆集：Remember Set）</span></a><ol class="toc-child"><li class="toc-item toc-level-4"><a class="toc-link" href="#写屏障"><span class="toc-text">写屏障</span></a></li><li class="toc-item toc-level-4"><a class="toc-link" href="#Post-Write-Barrier"><span class="toc-text">Post-Write Barrier</span></a></li><li class="toc-item toc-level-4"><a class="toc-link" href="#Pre-Write-Barrier"><span class="toc-text">Pre-Write Barrier</span></a></li><li class="toc-item toc-level-4"><a class="toc-link" href="#管理RSet"><span class="toc-text">管理RSet</span></a></li><li class="toc-item toc-level-4"><a class="toc-link" href="#RSet实现过程"><span class="toc-text">RSet实现过程</span></a><ol class="toc-child"><li class="toc-item toc-level-5"><a class="toc-link" href="#赋值"><span class="toc-text">赋值</span></a></li><li class="toc-item toc-level-5"><a class="toc-link" href="#修改"><span class="toc-text">修改</span></a></li></ol></li></ol></li><li class="toc-item toc-level-3"><a class="toc-link" href="#Collection-Set（增量解决问题：CSet）"><span class="toc-text">Collection Set（增量解决问题：CSet）</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#CardTable（记录扫描跨代引用内存区域）"><span class="toc-text">CardTable（记录扫描跨代引用内存区域）</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#Refine线程"><span class="toc-text">Refine线程</span></a><ol class="toc-child"><li class="toc-item toc-level-4"><a class="toc-link" href="#工作原理"><span class="toc-text">工作原理</span></a></li><li class="toc-item toc-level-4"><a class="toc-link" href="#抽样线程"><span class="toc-text">抽样线程</span></a></li></ol></li></ol></li><li class="toc-item toc-level-2"><a class="toc-link" href="#缺陷"><span class="toc-text">缺陷</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#调优"><span class="toc-text">调优</span></a><ol class="toc-child"><li class="toc-item toc-level-3"><a class="toc-link" href="#XX-MaxGCPauseMillis-200（建立G1停顿预测模型）"><span class="toc-text">-XX:MaxGCPauseMillis&#x3D;200（建立G1停顿预测模型）</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#XX-G1HeapRegionSize-n设置G1区域大小"><span class="toc-text">-XX:G1HeapRegionSize&#x3D;n设置G1区域大小</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#XX-ParallelGCThreads-n设置STW工作线程个数"><span class="toc-text">-XX:ParallelGCThreads&#x3D;n设置STW工作线程个数</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#XX-InitiatingHeapOccupancyPercent-45设置触发标记周期的堆占用率阀值"><span class="toc-text">-XX:InitiatingHeapOccupancyPercent&#x3D;45设置触发标记周期的堆占用率阀值</span></a></li></ol></li></ol>
     </div>
   </div>
 

@@ -124,28 +124,118 @@
           
       </div>
       <div class="markdown-body">
-        <p>本文整体结构如下：</p>
-<p><img src="http://qd2x6jysb.bkt.clouddn.com/image-20200727143553122.png" alt="image-20200727143553122"></p>
-<p>CMS收集器是一种以获取最短回收停顿时间为目标的收集器。<br>CMS收集器是基于标记-清除算法实现的，是一种老年代收集器，通常与ParNew一起使用。</p>
-<h2 id="收集过程"><a href="#收集过程" class="headerlink" title="收集过程"></a>收集过程</h2><p><img src="http://qd2x6jysb.bkt.clouddn.com/image-20200728010409132.png" alt="image-20200728010409132"></p>
+        <p>CMS（Concurrent Mark Sweep）收集器是一种以获取最短回收停顿时间为目标的收集器。</p>
+<p>CMS（Concurrent Mark Sweep）收集器是基于<code>标记-清除</code>算法实现的，是一种<strong>老年代收集器</strong>，通常与<code>ParNew</code>（新生代）一起使用。</p>
+<p>它的目的是为了避免在回收老年代时长时间的停顿。</p>
+<blockquote>
+<p><a href="https://plumbr.io/handbook/garbage-collection-algorithms-implementations/concurrent-mark-and-sweep" target="_blank" rel="noopener">Concurrent mark and sweep</a>原文：</p>
+<p>​    This collector was designed to avoid long pauses while collecting in the Old Generation. It achieves this by two means. Firstly, it does not compact the Old Generation but uses free-lists to manage reclaimed space. Secondly, it does most of the job in the mark-and-sweep phases concurrently with the application. This means that garbage collection is not explicitly stopping the application threads to perform these phases. It should be noted, however, that it still competes for CPU time with the application threads. By default, the number of threads used by this GC algorithm equals to ¼ of the number of physical cores of your machine.</p>
+<p>大概上面一段就说了这些：</p>
+<p>他的实现分为两方面：</p>
 <ul>
-<li><p>初始标记（STW）：</p>
-<p>需要“Stop the World”，初始标记仅仅只是标记一下GC Root能直接关联到的对象，速度很快。</p>
-</li>
-<li><p>并发标记：</p>
-<p>是主要标记过程，这个标记过程是和用户线程并发执行的。</p>
-</li>
-<li><p>并发预处理：</p>
-<p>标记从新生代晋升的对象、新分配到老年代的对象以及在并发阶段被修改了的对象。</p>
-</li>
-<li><p>重新标记（STW）：</p>
-<p>需要“Stop the World”，为了修正并发标记期间因用户程序继续运作而导致标记产生变动的那一部分对象的标记记录（停顿时间比初始标记长，但比并发标记短得多）。</p>
-</li>
-<li><p>并发清除：</p>
-<p>和用户线程并发执行的，基于标记结果来清理对象。</p>
-</li>
+<li>第一，它不清楚Old代，而是使用空闲列表管理回收空间。</li>
+<li>第二，它在标记清除期间的大部分工作和应用程序并发执行。这意味着执行这些阶段，收集器不会刻意停顿应用线程。</li>
 </ul>
-<h3 id="如果在重新标记之前刚好发生了一次MinorGC，会不会导致重新标记阶段Stop-the-World时间太长？"><a href="#如果在重新标记之前刚好发生了一次MinorGC，会不会导致重新标记阶段Stop-the-World时间太长？" class="headerlink" title="如果在重新标记之前刚好发生了一次MinorGC，会不会导致重新标记阶段Stop the World时间太长？"></a>如果在重新标记之前刚好发生了一次MinorGC，会不会导致重新标记阶段Stop the World时间太长？</h3><p>不会的，在并发标记阶段其实还包括了一次并发的预清理阶段，虚拟机会主动等待年轻代发生垃圾回收，这样可以将重新标记对象引用关系的步骤放在并发标记阶段，有效降低重新标记阶段Stop The World的时间。</p>
+</blockquote>
+<p><strong>开启CMS垃圾收集器：</strong></p>
+<figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">-XX:+UseConcMarkSweepGC</span><br></pre></td></tr></table></figure>
+
+
+
+<h2 id="使用场景"><a href="#使用场景" class="headerlink" title="使用场景"></a>使用场景</h2><p>GC过程短暂停，适合对时延要求较高的服务，用户线程不允许长时间的停顿。</p>
+<h2 id="收集过程"><a href="#收集过程" class="headerlink" title="收集过程"></a>收集过程</h2><p><img src="http://qd2x6jysb.bkt.clouddn.com/image-20200728010409132.png" alt="image-20200728010409132"></p>
+<h3 id="初始标记（STW-InitialMarking）"><a href="#初始标记（STW-InitialMarking）" class="headerlink" title="初始标记（STW, InitialMarking）"></a>初始标记（STW, InitialMarking）</h3><p><img src="http://qd2x6jysb.bkt.clouddn.com/image-20200729172826293.png" alt="image-20200729172826293"></p>
+<ul>
+<li>标记一下GC Root能直接关联到的对象；</li>
+<li>遍历新生代对象，标记可达的老年代对象；</li>
+</ul>
+<h3 id="并发标记（Concurrent-Marking）"><a href="#并发标记（Concurrent-Marking）" class="headerlink" title="并发标记（Concurrent Marking）"></a>并发标记（Concurrent Marking）</h3><p><img src="http://qd2x6jysb.bkt.clouddn.com/image-20200729172839191.png" alt="image-20200729172839191"></p>
+<p>是<strong>主要标记过程</strong>，这个标记过程是和用户线程并发执行的。</p>
+<ul>
+<li>遍历<code>InitialMarking</code>阶段标记出来的存活对象，然后继续递归标记这些对象可达的对象；</li>
+<li>该阶段<strong>并发执行</strong>的，在运行期间可能发生新生代的对象晋升到老年代、或者是直接在老年代分配对象、或者更新老年代对象的引用关系等等，对于这些对象，都是需要进行重新标记的，否则有些对象就会被遗漏，发生<strong>漏标</strong>的情况。</li>
+</ul>
+<p>该阶段会把上述对象所在的<code>Card</code>标识为<code>Dirty</code>，后续只需扫描这些<code>Dirty Card</code>的对象，避免扫描整个老年代。（类似G1的处理）</p>
+<h3 id="并发预处理（PreCleaning-amp-AbortablePreclean）"><a href="#并发预处理（PreCleaning-amp-AbortablePreclean）" class="headerlink" title="并发预处理（PreCleaning &amp; AbortablePreclean）"></a>并发预处理（PreCleaning &amp; AbortablePreclean）</h3><p><code>-XX:CMSPrecleaningEnabled</code>可关闭当前阶段，默认<strong>启用</strong>：</p>
+<ul>
+<li>标记从新生代晋升的对象、新分配到老年代的对象；</li>
+<li>在并发阶段被修改了的对象；如果老年代中有对象内部引用发生变化，会把所在的<code>Card</code>标记为<code>Dirty</code>（其实这里并非使用<code>CardTable</code>，而是一个类似的数据结构，叫<code>ModUnionTalble</code>），通过扫描这些Table，重新标记那些在并发标记阶段引用被更新的对象；</li>
+</ul>
+<h4 id="还有个AbortablePreclean（可中断预清理）："><a href="#还有个AbortablePreclean（可中断预清理）：" class="headerlink" title="还有个AbortablePreclean（可中断预清理）："></a>还有个<strong><code>AbortablePreclean</code>（可中断预清理）</strong>：</h4><p>该阶段发生的前提是：</p>
+<p>当Eden区的内存使用量大于参数<code>CMSScheduleRemarkEdenSizeThreshold</code>，默认2M，如果新生代对象太少，则没有执行该阶段的必要，直接执行<code>Remarking （重新标记阶段）</code>。</p>
+<h4 id="为什么需要这个阶段，存在的价值是什么？"><a href="#为什么需要这个阶段，存在的价值是什么？" class="headerlink" title="为什么需要这个阶段，存在的价值是什么？"></a><strong>为什么需要这个阶段，存在的价值是什么？</strong></h4><p>在该阶段，主要循环的做两件事：</p>
+<ol>
+<li>处理 <code>From</code> 和 <code>To 区</code>的对象，标记可达的老年代对象；</li>
+<li>和上一个阶段一样，扫描处理<code>Dirty Card</code>中的对象；</li>
+</ol>
+<h3 id="重新标记（STW-Final-Remark）"><a href="#重新标记（STW-Final-Remark）" class="headerlink" title="重新标记（STW, Final Remark）"></a>重新标记（STW, Final Remark）</h3><p>为了修正并发标记期间因用户程序继续运作而导致标记产生变动的那一部分对象的标记记录（停顿时间比初始标记长，但比并发标记短得多）。（应用线程停顿期间标记所有的存活对象，处理弱引用，卸载无用class对象，清除拥有class级别元数据的符号和字符串表，和其内部的String）</p>
+<h3 id="并发清理（Concurrent-Preclean）"><a href="#并发清理（Concurrent-Preclean）" class="headerlink" title="并发清理（Concurrent Preclean）"></a>并发清理（<strong>Concurrent Preclean</strong>）</h3><p>和用户线程并发执行的，基于标记结果来清理对象。</p>
+<blockquote>
+<p>​    This is again a concurrent phase, running in parallel with the application threads, not stopping them. While the previous phase was running concurrently with the application, some references were changed. Whenever that happens, the JVM marks the area of the heap (called “Card”) that contains the mutated object as “dirty”.</p>
+<p>译文：</p>
+<p>​    这又是一个并发阶段，与应用程序线程并行运行，而不是停止它们。 当上一阶段与应用程序同时运行时，某些引用已更改。 每当发生这种情况时，JVM会将包含mutated objects的堆区域（称为“card”）标记为“dirty”。</p>
+</blockquote>
+<p><img src="http://qd2x6jysb.bkt.clouddn.com/image-20200729180513498.png" alt="image-20200729180513498"></p>
+<blockquote>
+<p>​    In the pre-cleaning phase, these dirty objects are accounted for, and the objects reachable from them are also marked. The cards are cleaned when this is done.</p>
+<p>译文：</p>
+<p>​    在Preclean阶段，应对这些dirty对象进行处理，并标出从它们可触及的对象。 完成后，将清理card。</p>
+</blockquote>
+<p><img src="http://qd2x6jysb.bkt.clouddn.com/image-20200729180733788.png" alt="image-20200729180733788"></p>
+<h3 id="并发重置（CMS-concurrent-reset）"><a href="#并发重置（CMS-concurrent-reset）" class="headerlink" title="并发重置（CMS-concurrent-reset）"></a>并发重置（CMS-concurrent-reset）</h3><p>收集器做一些收尾的工作，以便下一次 GC 周期能有一个干净的状态。</p>
+<h3 id="问题"><a href="#问题" class="headerlink" title="问题"></a>问题</h3><h4 id="如果在重新标记之前刚好发生了一次MinorGC，会不会导致重新标记阶段Stop-the-World时间太长？"><a href="#如果在重新标记之前刚好发生了一次MinorGC，会不会导致重新标记阶段Stop-the-World时间太长？" class="headerlink" title="如果在重新标记之前刚好发生了一次MinorGC，会不会导致重新标记阶段Stop the World时间太长？"></a>如果在重新标记之前刚好发生了一次MinorGC，会不会导致重新标记阶段Stop the World时间太长？</h4><p>不会的，在并发标记阶段其实还包括了一次并发的预清理阶段，虚拟机会主动等待年轻代发生垃圾回收，这样可以将重新标记对象引用关系的步骤放在并发标记阶段，有效降低重新标记阶段<code>STW</code>的时间。</p>
+<h2 id="指令参数"><a href="#指令参数" class="headerlink" title="指令参数"></a>指令参数</h2><table>
+<thead>
+<tr>
+<th>参数</th>
+<th>解释</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>-XX：+UseConcMarkSweepGC</strong></td>
+<td>该标志首先是激活 CMS 收集器。默认 HotSpot JVM 使用的是并行收集器。</td>
+</tr>
+<tr>
+<td><strong>-XX：UseParNewGC</strong></td>
+<td>当使用 CMS 收集器时，该标志激活年轻代使用多线程并行执行垃圾回收。这令人很惊讶，我们不能简单在并行收集器中重用 - XX：UserParNewGC 标志，因为概念上年轻代用的算法是一样的。然而，对于 CMS 收集器，年轻代 GC 算法和老年代 GC 算法是不同的，因此年轻代 GC 有两种不同的实现，并且是两个不同的标志。注意最新的 JVM 版本，当使用 - XX：+UseConcMarkSweepGC 时，-XX：UseParNewGC 会自动开启。因此，如果年轻代的并行 GC 不想开启，可以通过设置 - XX：-UseParNewGC 来关掉。</td>
+</tr>
+<tr>
+<td><strong>-XX：+CMSConcurrentMTEnabled</strong></td>
+<td>当该标志被启用时，并发的 CMS 阶段将以多线程执行 （因此，多个 GC 线程会与所有的应用程序线程并行工作）。该标志已经默认开启，如果顺序执行更好，这取决于所使用的硬件，多线程执行可以通过<code>- XX：-CMSConcurremntMTEnabled</code> 禁用。</td>
+</tr>
+<tr>
+<td><strong>-XX：ConcGCThreads</strong></td>
+<td>定义并发 CMS 过程运行时的线程数。比如 value=4 意味着 CMS 周期的所有阶段都以 4 个线程来执行。</td>
+</tr>
+<tr>
+<td><strong>-XX:CMSInitiatingOccupancyFraction</strong></td>
+<td>该值代表老年代堆空间的使用率。比如，value=75意味着第一次CMS垃圾收集会在老年代被占用75%时被触发。通常<code>CMSInitiatingOccupancyFraction</code>的默认值为68。</td>
+</tr>
+<tr>
+<td><strong>-XX：+UseCMSInitiatingOccupancyOnly</strong></td>
+<td>命令 JVM 不基于运行时收集的数据来启动 CMS 垃圾收集周期。</td>
+</tr>
+<tr>
+<td><strong>-XX:+CMSClassUnloadingEnabled</strong></td>
+<td>开启对永久代进行垃圾回收。</td>
+</tr>
+<tr>
+<td><strong>-XX:+CMSIncrementalMode</strong></td>
+<td>开启 CMS 收集器的增量模式。增量模式经常暂停 CMS 过程，以便对应用程序线程作出完全的让步。</td>
+</tr>
+<tr>
+<td><strong>-XX:+ExplicitGCInvokesConcurrent</strong></td>
+<td>JVM 无论什么时候调用系统 GC，都执行 CMS GC，而不是 Full GC。</td>
+</tr>
+<tr>
+<td><strong>-XX:+ExplicitGCInvokesConcurrentAndUnloadsClasses</strong></td>
+<td>保证当有系统 GC 调用时，永久代也被包括进 CMS 垃圾回收的范围内。</td>
+</tr>
+<tr>
+<td><strong>-XX:+DisableExplicitGC</strong></td>
+<td>该标志将告诉 JVM 完全忽略系统的 GC 调用 (不管使用的收集器是什么类型)。</td>
+</tr>
+</tbody></table>
 <h2 id="优点"><a href="#优点" class="headerlink" title="优点"></a>优点</h2><ul>
 <li>并发收集；</li>
 <li>停顿时间短；</li>
@@ -170,8 +260,23 @@
 <li>参数<code>-XX:CMSFullGCsBeforeCompaction</code> ，用于设置执行多少次不压缩的<code>Full GC</code>后，跟着来一次压缩的。<br>（默认值0，表示每次进入Full GC都进行碎片整理）</li>
 </ul>
 </li>
+<li><p><strong>漏标问题处理效率低于G1</strong>；</p>
+</li>
+<li><p><strong>对象分配率高</strong></p>
+<p>如果获取对象实例的频率高于收集器清除堆里死对象的频率，并发算法将再次失败。</p>
+<p>从某种程度上说，老年代将没有足够的可用空间来容纳一个从年轻代提升过来的对象。这种情况被称为 “并发模式失败（<code>Concurrent Failed</code>）”，并且 JVM 会执行堆碎片整理：触发 Full GC。（可能是是老年代有大量不必要的对象。）</p>
+<ul>
+<li>方法一：增加年轻代的堆大小，以防止年轻代短生命的对象提前进入老年代；</li>
+<li>方法二：利用分析器，快照运行系统的堆转储，并且分析过度的对象分配，找出这些对象，最终减少这些对象的申请。</li>
 </ul>
-<p>在<code>CMS</code>中，也有<code>RSet</code>的概念，在老年代中有一块区域用来记录指向新生代的引用。这是一种<code>point-out</code>，在进行Young GC时，扫描根时，仅仅需要扫描这一块区域，而不需要扫描整个老年代。</p>
+</li>
+</ul>
+<p>注：</p>
+<p>在<code>CMS</code>中，也有<code>RSet</code>的概念，在老年代中有一块区域用来记录指向新生代的引用。这是一种<code>point-out</code>，在进行Young GC时，扫描根时，仅仅需要扫描这一块区域，而不需要扫描整个老年代。（G1是<code>point-in</code>）</p>
+<p>参考：</p>
+<p><a href="https://blog.codecentric.de/en/2013/10/useful-jvm-flags-part-7-cms-collector/" target="_blank" rel="noopener">Useful JVM Flags - Part 7(CMS Collector)</a></p>
+<p><a href="https://plumbr.io/handbook/garbage-collection-algorithms-implementations/concurrent-mark-and-sweep" target="_blank" rel="noopener">Concurrent mark and sweep</a></p>
+<p><a href="http://psy-lob-saw.blogspot.com/2014/10/the-jvm-write-barrier-card-marking.html" target="_blank" rel="noopener">The JVM Write Barrier - Card Marking</a></p>
 
       </div>
       
@@ -226,7 +331,7 @@
   <div class="post-catalog" id="catalog">
     <div class="title">目录</div>
     <div class="catalog-content">
-      <ol class="toc"><li class="toc-item toc-level-2"><a class="toc-link" href="#收集过程"><span class="toc-text">收集过程</span></a><ol class="toc-child"><li class="toc-item toc-level-3"><a class="toc-link" href="#如果在重新标记之前刚好发生了一次MinorGC，会不会导致重新标记阶段Stop-the-World时间太长？"><span class="toc-text">如果在重新标记之前刚好发生了一次MinorGC，会不会导致重新标记阶段Stop the World时间太长？</span></a></li></ol></li><li class="toc-item toc-level-2"><a class="toc-link" href="#优点"><span class="toc-text">优点</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#缺点"><span class="toc-text">缺点</span></a></li></ol>
+      <ol class="toc"><li class="toc-item toc-level-2"><a class="toc-link" href="#使用场景"><span class="toc-text">使用场景</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#收集过程"><span class="toc-text">收集过程</span></a><ol class="toc-child"><li class="toc-item toc-level-3"><a class="toc-link" href="#初始标记（STW-InitialMarking）"><span class="toc-text">初始标记（STW, InitialMarking）</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#并发标记（Concurrent-Marking）"><span class="toc-text">并发标记（Concurrent Marking）</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#并发预处理（PreCleaning-amp-AbortablePreclean）"><span class="toc-text">并发预处理（PreCleaning &amp; AbortablePreclean）</span></a><ol class="toc-child"><li class="toc-item toc-level-4"><a class="toc-link" href="#还有个AbortablePreclean（可中断预清理）："><span class="toc-text">还有个AbortablePreclean（可中断预清理）：</span></a></li><li class="toc-item toc-level-4"><a class="toc-link" href="#为什么需要这个阶段，存在的价值是什么？"><span class="toc-text">为什么需要这个阶段，存在的价值是什么？</span></a></li></ol></li><li class="toc-item toc-level-3"><a class="toc-link" href="#重新标记（STW-Final-Remark）"><span class="toc-text">重新标记（STW, Final Remark）</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#并发清理（Concurrent-Preclean）"><span class="toc-text">并发清理（Concurrent Preclean）</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#并发重置（CMS-concurrent-reset）"><span class="toc-text">并发重置（CMS-concurrent-reset）</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#问题"><span class="toc-text">问题</span></a><ol class="toc-child"><li class="toc-item toc-level-4"><a class="toc-link" href="#如果在重新标记之前刚好发生了一次MinorGC，会不会导致重新标记阶段Stop-the-World时间太长？"><span class="toc-text">如果在重新标记之前刚好发生了一次MinorGC，会不会导致重新标记阶段Stop the World时间太长？</span></a></li></ol></li></ol></li><li class="toc-item toc-level-2"><a class="toc-link" href="#指令参数"><span class="toc-text">指令参数</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#优点"><span class="toc-text">优点</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#缺点"><span class="toc-text">缺点</span></a></li></ol>
     </div>
   </div>
 
