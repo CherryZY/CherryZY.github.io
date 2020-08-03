@@ -7,7 +7,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   
   
-  <title>CMS&amp;G1 Collector如何标记对象？会有什么问题？ | coder的特殊身份</title>
+  <title>面试官：说说类加载机制与类加载器？如何打破呢？ | coder的特殊身份</title>
 
   
     <link rel="apple-touch-icon" href="/images/favicon.png">
@@ -95,7 +95,7 @@
   <!-- 文章内容页 url形式：https://yoursite/文章标题/ -->
   <div class="container post-details" id="post-details">
     <div class="post-content">
-      <div class="post-title">CMS&G1 Collector如何标记对象？会有什么问题？</div>
+      <div class="post-title">面试官：说说类加载机制与类加载器？如何打破呢？</div>
       <div class="post-attach">
         <span class="post-pubtime">2020-07-30</span>
         
@@ -103,14 +103,14 @@
                 <i class="iconfont icon-tags" title="标签 | tags"></i>
                 
                 <span class="span--tag">
-                  <a href="/tags/JVM/" title="查看 JVM 标签">
-                    <b>#</b> JVM
+                  <a href="/tags/%E9%9D%A2%E8%AF%95/" title="查看 面试 标签">
+                    <b>#</b> 面试
                   </a>
                 </span>
                 
                 <span class="span--tag">
-                  <a href="/tags/GC/" title="查看 GC 标签">
-                    <b>#</b> GC
+                  <a href="/tags/JVM/" title="查看 JVM 标签">
+                    <b>#</b> JVM
                   </a>
                 </span>
                 
@@ -118,26 +118,27 @@
           
       </div>
       <div class="markdown-body">
-        <h2 id="GC时如何对对象进行标记？"><a href="#GC时如何对对象进行标记？" class="headerlink" title="GC时如何对对象进行标记？"></a>GC时如何对对象进行标记？</h2><h3 id="三色标记"><a href="#三色标记" class="headerlink" title="三色标记"></a>三色标记</h3><p><img src="http://qd2x6jysb.bkt.clouddn.com/image-20200803190002786.png" alt="image-20200803190002786"></p>
-<ul>
-<li><strong>白色</strong>：尚未访问过。</li>
-<li><strong>黑色</strong>：本对象已访问过，而且本对象 引用到 的其他对象 也全部访问过了。</li>
-<li><strong>灰色</strong>：本对象已访问过，但是本对象 引用到 的其他对象 尚未全部访问完。全部访问后，会转换为黑色。</li>
+        <h2 id="加载时机"><a href="#加载时机" class="headerlink" title="加载时机"></a>加载时机</h2><h2 id="双亲委派"><a href="#双亲委派" class="headerlink" title="双亲委派"></a>双亲委派</h2><p><img src="http://qd2x6jysb.bkt.clouddn.com/image-20200730213747576.png" alt="image-20200730213747576"></p>
+<h3 id="好处"><a href="#好处" class="headerlink" title="好处"></a>好处</h3><ul>
+<li>稳定</li>
 </ul>
-<h2 id="漏标及其处理方式？"><a href="#漏标及其处理方式？" class="headerlink" title="漏标及其处理方式？"></a>漏标及其处理方式？</h2><p>漏标：</p>
-<p><img src="http://qd2x6jysb.bkt.clouddn.com/image-20200730112316708.png" alt="image-20200730112316708"></p>
-<h3 id="CMS（解决方案：Incremental-Update）"><a href="#CMS（解决方案：Incremental-Update）" class="headerlink" title="CMS（解决方案：Incremental Update）"></a>CMS（解决方案：Incremental Update）</h3><p><img src="http://qd2x6jysb.bkt.clouddn.com/image-20200730113841152.png" alt="image-20200730113841152"></p>
-<p>假设<code>B-&gt;D</code>消失，A指向D，则在下次标记（重新标记 <code>Remark</code>）时，从<code>A</code>重新标记，<code>D</code>没有被标记，则使<code>A</code>标记为<strong>灰色</strong>即可。</p>
-<h4 id="问题"><a href="#问题" class="headerlink" title="问题"></a>问题</h4><p><img src="http://qd2x6jysb.bkt.clouddn.com/image-20200730111107874.png" alt="image-20200730111107874"></p>
-<h3 id="G1（解决方案：SATB-Snapshot-At-The-Begin）"><a href="#G1（解决方案：SATB-Snapshot-At-The-Begin）" class="headerlink" title="G1（解决方案：SATB -  Snapshot At The Begin）"></a>G1（解决方案：SATB -  Snapshot At The Begin）</h3><p>在起始的时候做一个快照，当<code>B-&gt;D</code>消失，则把这个引用推到<code>GC</code>的堆栈中，保证<code>D</code>还能被<code>GC</code>扫描到。</p>
-<p>配合<code>RSet</code>，只用扫描哪些<code>Region</code>引用到<code>D</code>这个<code>Region</code>了。</p>
-
+<h2 id="Tomcat类加载机制"><a href="#Tomcat类加载机制" class="headerlink" title="Tomcat类加载机制"></a>Tomcat类加载机制</h2><h3 id="层次结构"><a href="#层次结构" class="headerlink" title="层次结构"></a>层次结构</h3><p><img src="http://qd2x6jysb.bkt.clouddn.com/image-20200730214725346.png" alt="image-20200730214725346"></p>
+<h2 id="SPI"><a href="#SPI" class="headerlink" title="SPI"></a>SPI</h2><p><code>Service Provider Interface</code>机制</p>
+<p><img src="http://qd2x6jysb.bkt.clouddn.com/image-20200730220449644.png" alt="image-20200730220449644"></p>
+<ul>
+<li><p>JDBC</p>
+<p>接口编程+策略模式+配置文件</p>
+</li>
+<li><p>线程的上下文类加载器</p>
+</li>
+</ul>
+<h2 id="OSGI"><a href="#OSGI" class="headerlink" title="OSGI"></a>OSGI</h2>
       </div>
       
         <div class="prev-or-next">
           <div class="post-foot-next">
             
-              <a href="/2020/07/29/%E9%9D%A2%E8%AF%95%E5%AE%98%EF%BC%9A%E8%AE%B2%E4%B8%8BSpring%E7%9A%84Bean%E5%8A%A0%E8%BD%BD%E6%B5%81%E7%A8%8B%EF%BC%9F%E4%BB%A5%E5%8F%8ABean%E5%BE%AA%E7%8E%AF%E4%BE%9D%E8%B5%96%E5%9C%A8Spring%E4%B8%AD%E5%A6%82%E4%BD%95%E8%A7%A3%E5%86%B3%E7%9A%84%EF%BC%9F/" target="_self">
+              <a href="/2020/07/30/CMS&G1%20Collector%E5%A6%82%E4%BD%95%E6%A0%87%E8%AE%B0%E5%AF%B9%E8%B1%A1%EF%BC%9F%E4%BC%9A%E6%9C%89%E4%BB%80%E4%B9%88%E9%97%AE%E9%A2%98%EF%BC%9F/" target="_self">
                 <i class="iconfont icon-chevronleft"></i>
                 <span>PREV</span>
               </a>
@@ -150,14 +151,14 @@
                     <i class="iconfont icon-tags" title="标签 | tags"></i>
                     
                     <span class="span--tag">
-                      <a href="/tags/JVM/" title="查看 JVM 标签">
-                        <b>#</b> JVM
+                      <a href="/tags/%E9%9D%A2%E8%AF%95/" title="查看 面试 标签">
+                        <b>#</b> 面试
                       </a>
                     </span>
                     
                     <span class="span--tag">
-                      <a href="/tags/GC/" title="查看 GC 标签">
-                        <b>#</b> GC
+                      <a href="/tags/JVM/" title="查看 JVM 标签">
+                        <b>#</b> JVM
                       </a>
                     </span>
                     
@@ -166,7 +167,7 @@
           </div>
           <div class="post-foot-prev">
             
-              <a href="/2020/07/30/%E9%9D%A2%E8%AF%95%E5%AE%98%EF%BC%9A%E8%AF%B4%E8%AF%B4%E7%B1%BB%E5%8A%A0%E8%BD%BD%E6%9C%BA%E5%88%B6%E4%B8%8E%E7%B1%BB%E5%8A%A0%E8%BD%BD%E5%99%A8%EF%BC%9F%E5%A6%82%E4%BD%95%E6%89%93%E7%A0%B4%E5%91%A2%EF%BC%9F/" target="_self">
+              <a href="/2020/07/31/%E9%9D%A2%E8%AF%95%E5%AE%98%EF%BC%9A%E4%BB%8E%20innodb%20%E7%9A%84%E7%B4%A2%E5%BC%95%E7%BB%93%E6%9E%84%E5%88%86%E6%9E%90%EF%BC%8C%E4%B8%BA%E4%BB%80%E4%B9%88%E7%B4%A2%E5%BC%95%E7%9A%84%20key%20%E9%95%BF%E5%BA%A6%E4%B8%8D%E8%83%BD%E5%A4%AA%E9%95%BF%EF%BC%9F/" target="_self">
                 <span>NEXT</span>
                 <i class="iconfont icon-chevronright"></i>
               </a>
@@ -179,7 +180,7 @@
   <div class="post-catalog" id="catalog">
     <div class="title">目录</div>
     <div class="catalog-content">
-      <ol class="toc"><li class="toc-item toc-level-2"><a class="toc-link" href="#GC时如何对对象进行标记？"><span class="toc-text">GC时如何对对象进行标记？</span></a><ol class="toc-child"><li class="toc-item toc-level-3"><a class="toc-link" href="#三色标记"><span class="toc-text">三色标记</span></a></li></ol></li><li class="toc-item toc-level-2"><a class="toc-link" href="#漏标及其处理方式？"><span class="toc-text">漏标及其处理方式？</span></a><ol class="toc-child"><li class="toc-item toc-level-3"><a class="toc-link" href="#CMS（解决方案：Incremental-Update）"><span class="toc-text">CMS（解决方案：Incremental Update）</span></a><ol class="toc-child"><li class="toc-item toc-level-4"><a class="toc-link" href="#问题"><span class="toc-text">问题</span></a></li></ol></li><li class="toc-item toc-level-3"><a class="toc-link" href="#G1（解决方案：SATB-Snapshot-At-The-Begin）"><span class="toc-text">G1（解决方案：SATB -  Snapshot At The Begin）</span></a></li></ol></li></ol>
+      <ol class="toc"><li class="toc-item toc-level-2"><a class="toc-link" href="#加载时机"><span class="toc-text">加载时机</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#双亲委派"><span class="toc-text">双亲委派</span></a><ol class="toc-child"><li class="toc-item toc-level-3"><a class="toc-link" href="#好处"><span class="toc-text">好处</span></a></li></ol></li><li class="toc-item toc-level-2"><a class="toc-link" href="#Tomcat类加载机制"><span class="toc-text">Tomcat类加载机制</span></a><ol class="toc-child"><li class="toc-item toc-level-3"><a class="toc-link" href="#层次结构"><span class="toc-text">层次结构</span></a></li></ol></li><li class="toc-item toc-level-2"><a class="toc-link" href="#SPI"><span class="toc-text">SPI</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#OSGI"><span class="toc-text">OSGI</span></a></li></ol>
     </div>
   </div>
 

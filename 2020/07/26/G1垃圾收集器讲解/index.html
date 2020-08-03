@@ -126,10 +126,21 @@
       <div class="markdown-body">
         <p>经过两三天的梳理，我就只想说：这玩意儿英文不好真的影响理解的速度。</p>
 <p>算了看正文吧。</p>
-<p><strong>G1 =&gt; 包含最多垃圾的region总是优先被收集</strong></p>
+<p><strong>G1 =&gt; 包含最多垃圾的region总是优先被收集</strong>。</p>
 <p>G1垃圾收集器（<code>Garbage First</code>），从JDK7 开始提供，是一种响应时间优先的GC算法。</p>
-<p>G1致力于在多CPU和大内存服务器上对垃圾回收提供<strong>软实时目标</strong>和<strong>高吞吐量</strong>。</p>
+<p>G1致力于在<strong>多CPU和大内存服务器</strong>上对垃圾回收提供<strong>软实时目标</strong>和<strong>高吞吐量</strong>。</p>
 <p><strong>使用“<code>复制+标记整理算法</code>”，跨新生代和老年代，化整为零。</strong></p>
+<blockquote>
+<p>在<code>G1</code>提出之前，经典的垃圾收集器主要有三种类型：<strong>串行收集器</strong>、<strong>并行收集器</strong>和<strong>并发标记清除收集器</strong>，这三种收集器分别可以是满足<code>Java</code>应用三种不同的需求：</p>
+<ul>
+<li>内存占用及并发开销最小化；</li>
+<li>应用吞吐量最大化；</li>
+<li>应用<code>GC</code>暂停时间最小化；</li>
+</ul>
+<p>但是，上述三种垃圾收集器都有几个共同的<strong>问题</strong>：</p>
+<p>（1）所有针对老年代的操作必须扫描整个老年代空间；</p>
+<p>（2）新生代和老年代是独立的连续的内存块，必须先决定年轻代和老年代在虚拟地址空间的位置。</p>
+</blockquote>
 <p>不同于之前的<code>CMS</code>、<code>PS</code>、<code>SericalOld</code>、<code>ParallelNew</code>…等收集器。</p>
 <h2 id="区别"><a href="#区别" class="headerlink" title="区别"></a><strong>区别</strong></h2><ul>
 <li><p><strong>G1会根据预测时间动态改变新生代大小；</strong></p>
@@ -137,7 +148,8 @@
 <p>G1中则是以预测时间为导向，根据内存的使用情况调整新生代分区的数目。</p>
 </li>
 <li><p><strong>G1老年代的垃圾回收方式与其他JVM垃圾回收器对老年代的处理不同：</strong></p>
-<p>G1老生代的收集不会为了释放老生代的空间对整个老生代做回收。相反，在任意时刻只有一部分老生代分区会被回收，并且，这部分老生代分区将在下一次<strong>增量回收</strong>时与所有的新生代分区一起被收集。<br>这就是我们所说的混合回收（<code>Mixed GC</code>）。</p>
+<p>G1老生代的收集不会为了释放老生代的空间对整个老生代做回收。相反，在任意时刻只有一部分老生代分区会被回收，并且，这部分老生代分区将在下一次<strong>增量回收</strong>时与所有的新生代分区一起被收集。</p>
+<p>这就是我们所说的混合回收（<code>Mixed GC</code>）。</p>
 </li>
 <li><p><code>G1</code>取消了传统的固定分代区域，取而代之的是<strong>将内存区域分为多个<code>Reigon</code></strong>，每个区域都可以根据需要扮演新生代的<code>Eden</code>或者<code>Survivor</code>，又或者<code>PermGen</code>。</p>
 </li>
@@ -175,22 +187,12 @@
 </blockquote>
 <p>好了，此刻是不是<strong>似懂非懂 + 一脸蒙蔽</strong>？好的，我get的到，带着问题先往下看。</p>
 <p><img src="http://qd2x6jysb.bkt.clouddn.com/image-20200727144749035.png" alt="image-20200727144749035"></p>
-<h3 id="分区类型分为？"><a href="#分区类型分为？" class="headerlink" title="分区类型分为？"></a>分区类型分为？</h3><ul>
-<li><p><strong>自由分区（Free Heap Region，FHR）</strong></p>
-</li>
-<li><p><strong>新生代分区（Young Heap Region，YHR）</strong></p>
-<p><code>-XX:G1MaxNewSizePercent</code>（默认60）和<code>-XX:G1NewSizePercent</code>（默认5）控制<strong>新生代</strong>大小。</p>
-</li>
-<li><p><strong>大对象分区（Humongous Heap Region，HHR，本质还是O区的）</strong></p>
-<ul>
+<h3 id="分区类型分为？"><a href="#分区类型分为？" class="headerlink" title="分区类型分为？"></a>分区类型分为？</h3><h4 id="自由分区（Free-Heap-Region，FHR）"><a href="#自由分区（Free-Heap-Region，FHR）" class="headerlink" title="自由分区（Free Heap Region，FHR）"></a><strong>自由分区（Free Heap Region，FHR）</strong></h4><h4 id="新生代分区（Young-Heap-Region，YHR）"><a href="#新生代分区（Young-Heap-Region，YHR）" class="headerlink" title="新生代分区（Young Heap Region，YHR）"></a><strong>新生代分区（Young Heap Region，YHR）</strong></h4><p><code>-XX:G1MaxNewSizePercent</code>（默认60）和<code>-XX:G1NewSizePercent</code>（默认5）控制<strong>新生代</strong>大小。</p>
+<h4 id="大对象分区（Humongous-Heap-Region，HHR，本质还是O区的）"><a href="#大对象分区（Humongous-Heap-Region，HHR，本质还是O区的）" class="headerlink" title="大对象分区（Humongous Heap Region，HHR，本质还是O区的）"></a><strong>大对象分区（Humongous Heap Region，HHR，本质还是O区的）</strong></h4><ul>
 <li><strong>大对象头分区</strong></li>
 <li><strong>大对象连续分区</strong></li>
 </ul>
-</li>
-<li><p><strong>老生代分区（Old Heap Region，OHR）</strong></p>
-</li>
-</ul>
-<p>图中，<code>Humongous</code>区域（短期存在）：</p>
+<h4 id="老生代分区（Old-Heap-Region，OHR）"><a href="#老生代分区（Old-Heap-Region，OHR）" class="headerlink" title="老生代分区（Old Heap Region，OHR）"></a><strong>老生代分区（Old Heap Region，OHR）</strong></h4><p>图中，<code>Humongous</code>区域（短期存在）：</p>
 <p>大对象（当新建对象大小超过Region区域的一半）放到<code>Humongous</code>区域（新的一个区域），若对象大小超过一个<code>Humongous</code>区域，则多个连续<code>Humongous</code>存储。</p>
 <figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">#</span><span class="bash"> 大小默认为0，指定分区大小（1MB ～ 32MB，且必须是2的幂），默认将整堆划分为`2048`个分区。</span></span><br><span class="line">-XX:G1HeapRegionSize=0</span><br></pre></td></tr></table></figure>
 
@@ -511,7 +513,7 @@
 <p>当对象扫描完成后，并发时用户线程可能会有引用变动的对象，这些对象有可能会<strong>漏标和错标（G1中使用SATB解决）</strong></p>
 <blockquote>
 <p>R大：</p>
-<p>并发阶段。不断从扫描栈取出引用递归扫描整个堆里的对象图。每扫描到一个对象就会对其标记，并将其字段压入扫描栈。重复扫描过程直到扫描栈清空。过程中还会扫描SATB write barrier所记录下的引用。</p>
+<p>并发阶段。不断从扫描栈取出引用递归扫描整个堆里的对象图。每扫描到一个对象就会对其标记，并将其字段压入扫描栈。重复扫描过程直到扫描栈清空。过程中还会扫描<code>SATB write barrier</code>所记录下的引用。</p>
 <p>引自R大回复 <a href="https://hllvm-group.iteye.com/group/topic/44381" target="_blank" rel="noopener">请教G1算法的原理</a></p>
 </blockquote>
 <p>（标记方式：<code>三色标记</code>，后面会抽出一篇文章论述）</p>
@@ -519,6 +521,15 @@
 
 
 
+<blockquote>
+<p>参考：<a href="http://www.narihiro.info/g1gc-impl-book/mark.html" target="_blank" rel="noopener">第10章　並行マーキング</a></p>
+<p><strong>任务窃取</strong>：（类似<code>ForkJoin</code>思想）</p>
+<p>并发标记阶段使用多个线程来完成扫描对象的任务。</p>
+<p>这里的问题是工作量：如果线程A做了大量工作，则其他线程B必须等待线程A的任务完成。</p>
+<p>在这种情况下，线程B将等待而不执行任何任务。</p>
+<p>这是没有用的，不是吗？不要让机器跳过。因此，您可能会认为应该预分配相同数量的任务，但是在许多情况下这是行不通的。因为测量准确的任务量很昂贵。</p>
+<p>在这种情况下，扫描对象的任务量取决于对象具有的参照关系的深度。探索对象的引用关系非常昂贵。因此，此处的并行标记阶段使用一种称为任务窃取的算法来平衡多个线程的工作。使用任务窃取，线程B不仅等待其任务完成，而且还窃取线程A的任务并急于完成。</p>
+</blockquote>
 <h4 id="最终-重新标记（Final-Marking）"><a href="#最终-重新标记（Final-Marking）" class="headerlink" title="最终/重新标记（Final Marking）"></a>最终/重新标记（Final Marking）</h4><p><strong>使用<code>SATB</code>记录标记。会发生STW</strong></p>
 <p>为了修正在并发标记期间因用户程序继续运作而导致标记产生变动的那一部分标记记录，</p>
 <p>虚拟机将这部分变化记录到线程<code>Remember Set Logs</code>中。</p>
@@ -529,8 +540,11 @@
 <p>引自R大回复 <a href="https://hllvm-group.iteye.com/group/topic/44381" target="_blank" rel="noopener">请教G1算法的原理</a></p>
 </blockquote>
 <blockquote>
-<p>RSet中写屏障的主要目的是为了标记引用关系；</p>
-<p>STAB中写屏障主要是为了保证并行标记的正确性，STAB主要记录的是目的对象修改之前的对象。</p>
+<p><code>RSet</code>中写屏障的主要目的是为了标记引用关系；</p>
+<p><code>STAB</code>中写屏障主要是为了保证并行标记的正确性，STAB主要记录的是目的对象修改之前的对象。</p>
+<p><code>SATB</code>算法创建了一个对象图，它是堆的一个逻辑“快照”。</p>
+<p>标记数据结构包括了两个位图：<code>previous</code>位图和<code>next</code>位图。</p>
+<p><code>previous</code>位图保存了最近一次完成的标记信息，并发标记周期会创建并更新<code>next</code>位图，随着时间的推移，<code>previous</code>位图会越来越过时，最终在并发标记周期结束的时候，<code>next</code>位图会将<code>previous</code>位图覆盖掉。</p>
 </blockquote>
 <p>用来处理并发阶段后遗留下少量的<code>SATB记录</code>（<strong>漏标</strong>）。</p>
 <figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">1.645: [GC remark 1.645: [Finalize Marking, 0.0009461 secs] </span><br><span class="line">1.646: [GC ref-proc, 0.0000417 secs]</span><br><span class="line">1.646: [Unloading, 0.0011301 secs], 0.0074056 secs][Times: user&#x3D;0.01 sys&#x3D;0.00, real&#x3D;0.01 secs]</span><br></pre></td></tr></table></figure>
@@ -563,7 +577,20 @@
 
 
 
-<h3 id="Evacuation（疏散暂停）"><a href="#Evacuation（疏散暂停）" class="headerlink" title="Evacuation（疏散暂停）"></a>Evacuation（疏散暂停）</h3><blockquote>
+<h3 id="Evacuation（疏散暂停）"><a href="#Evacuation（疏散暂停）" class="headerlink" title="Evacuation（疏散暂停）"></a>Evacuation（疏散暂停）</h3><p>疏散大致分为以下三个步骤：</p>
+<ul>
+<li><p>收藏集选择；</p>
+<p>选择要保存的区域的步骤。通过参考通过并行标记获得的信息来选择收集集。</p>
+</li>
+<li><p>疏散路线；</p>
+<p>将直接从集合集中的根引用的对象和从其他区域引用的对象保存到空白区域的步骤。</p>
+</li>
+<li><p>疏散；</p>
+<p>从已保存的对象开始保存子对象的步骤。</p>
+</li>
+</ul>
+<p>此外，疏散总是在安全点进行。因此，在疏散期间，所有变幅器均处于停止状态。</p>
+<blockquote>
 <p>2.3 Evacuation Pauses</p>
 <p>原文：</p>
 <p>​    At appropriate points (described in section 3.4), we stop the mutator threads and perform an evacuation pause. Here we choose acollection setof regions, and evacuate the re-gions by copying all their live objects to other locations inthe heap,  thus freeing the collection set regions.   Evacuation pauses exist to allow compaction:  object movement must appear atomic to mutators.  This atomicity is costly to achieve in truly concurrent systems, so we move objectsduring incremental stop-world pauses instead.</p>
@@ -580,6 +607,9 @@
 </ul>
 <h3 id="混合式垃圾收集（Mixed-GC）"><a href="#混合式垃圾收集（Mixed-GC）" class="headerlink" title="混合式垃圾收集（Mixed GC）"></a>混合式垃圾收集（Mixed GC）</h3><p><strong>并发垃圾回收</strong>周期结束后是混合垃圾回收周期，不仅进行年轻代垃圾收集，而且回收之前标记出来的老年代的垃圾最多的部分区块。</p>
 <p>混合垃圾回收周期会持续进行，直到几乎所有的被标记出来的分区（垃圾占比大的分区）都得到回收，然后恢复到常规的年轻代垃圾收集，最终再次启动并发周期。</p>
+<blockquote>
+<p>在混合收集周期中，对于要回收的分区，会<strong>将该分区中存活的数据拷贝到另一个分区</strong>，这也是为什么<strong>G1收集器最终出现碎片化的频率比CMS收集器小得多的原因 **—— 以这种方式回收对象，实际上</strong>伴随着针对当前分区的压缩**。</p>
+</blockquote>
 <h3 id="Full-GC"><a href="#Full-GC" class="headerlink" title="Full GC"></a>Full GC</h3><p>导致Full GC的情况：</p>
 <ul>
 <li><p><strong>concurrent mode failure（并发模式收集失败）；</strong></p>
@@ -700,12 +730,57 @@
 <p>……</p>
 <p>​    该屏障使用Stefanovi等人在简要提到的过滤技术。 如果写操作创建了从一个对象到同一堆区域中另一个对象的指针（我们希望这种情况很常见），则无需将其记录在RSet中。</p>
 </blockquote>
+<blockquote>
+<p>引自：<a href="https://hllvm-group.iteye.com/group/topic/44381" target="_blank" rel="noopener">请教G1算法的原理 - R大的回答</a></p>
+<p>G1 GC的heap与HotSpot VM的其它GC一样有一个覆盖整个heap的card table。<br>逻辑上说，G1 GC的remembered set（下面简称RSet）是每个region有一份。这个RSet记录的是从别的region指向该region的card。所以这是一种“points-into”的remembered set。</p>
+<p>用card table实现的remembered set通常是points-out的，也就是说card table要记录的是从它覆盖的范围出发指向别的范围的指针。以分代式GC的card table为例，要记录old -&gt; young的跨代指针，被标记的card是old gen范围内的。</p>
+<p>G1 GC则是在points-out的card table之上再加了一层结构来构成points-into RSet：每个region会记录下到底哪些别的region有指向自己的指针，而这些指针分别在哪些card的范围内。<br>这个RSet其实是一个hash table，key是别的region的起始地址，value是一个集合，里面的元素是card table的index。</p>
+<p>举例来说，如果region A的RSet里有一项的key是region B，value里有index为1234的card，它的意思就是region B的一个card里有引用指向region A。所以对region A来说，该RSet记录的是points-into的关系；而card table仍然记录了points-out的关系。</p>
+</blockquote>
 <p><strong>注：</strong></p>
 <p><strong>每个<code>Region</code>默认按照<code>512Kb</code>划分成多个<code>Card</code>，所以<code>RSet</code>需要记录的东西应该是 <code>xx Region</code>的<code>xx Card</code>。</strong></p>
 <p>（如下图：<code>Region1</code>和<code>Region3</code>中有对象引用了<code>Region2</code>的对象，则在<code>Region2</code>的<code>Rset</code>中记录了这些引用）</p>
 <p><img src="http://qd2x6jysb.bkt.clouddn.com/image-20200727201652054.png" alt="image-20200727201652054"></p>
 <h4 id="写屏障"><a href="#写屏障" class="headerlink" title="写屏障"></a>写屏障</h4><p>用来识别引用关系的变更。</p>
 <p><strong>写屏障</strong>是指在改变特定内存的值时（实际上也就是写入内存）额外执行的一些动作。</p>
+<blockquote>
+<p>所谓的写屏障，其实就是指在赋值操作前后，加入一些处理（可以参考AOP的概念）：</p>
+<figure class="highlight c++"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">void</span> <span class="title">oop_field_store</span><span class="params">(oop* field, oop new_value)</span> </span>&#123;  </span><br><span class="line">    pre_write_barrier(field); <span class="comment">// 写屏障-写前操作</span></span><br><span class="line">    *field = new_value; </span><br><span class="line">    post_write_barrier(field, value);  <span class="comment">// 写屏障-写后操作</span></span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p><strong>(1) 写屏障 + SATB</strong>（记录旧的引用对象）</p>
+<p>当对象E的成员变量的引用发生变化时（<code>objE.fieldG = null;</code>），我们可以利用写屏障，将E<strong>原来成员变量的引用</strong>对象G记录下来：</p>
+<figure class="highlight c++"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">void</span> <span class="title">pre_write_barrier</span><span class="params">(oop* field)</span> </span>&#123;</span><br><span class="line">    oop old_value = *field; <span class="comment">// 获取旧值</span></span><br><span class="line">    remark_set.add(old_value); <span class="comment">// 记录 原来的引用对象</span></span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>这种做法的思路是：<strong>尝试保留开始时的对象图，即原始快照（Snapshot At The Beginning，SATB）</strong>，当<strong>某个时刻</strong> 的<code>GC Roots</code>确定后，<strong>当时</strong>的对象图就已经确定了。</p>
+<p>（比如 <strong>当时</strong> D是引用着G的，那后续的标记也应该是按照这个时刻的对象图走（D引用着G）。如果期间发生变化，则可以记录起来，保证标记依然按照原本的视图来。）</p>
+<p><strong>(2) 写屏障 + 增量更新</strong>（记录新的引用对象）</p>
+<p>当对象D的成员变量的引用发生变化时（<code>objD.fieldG = G;</code>），我们可以利用写屏障，将D<strong>新的成员变量引用</strong>对象G记录下来：</p>
+<figure class="highlight c++"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">void</span> <span class="title">post_write_barrier</span><span class="params">(oop* field, oop new_value)</span> </span>&#123;  </span><br><span class="line">  <span class="keyword">if</span>($gc_phase == GC_CONCURRENT_MARK &amp;&amp; !isMarkd(field)) &#123;</span><br><span class="line">      remark_set.add(new_value); <span class="comment">// 记录新引用的对象</span></span><br><span class="line">  &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>这种做法的思路是：不要求保留原始快照，而是<strong>针对新增的引用</strong>，将其记录下来等待遍历，即增量更新（Incremental Update）。</p>
+<p><strong>(3) 读屏障（Load Barrier）</strong></p>
+<figure class="highlight c++"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line"><span class="function">oop <span class="title">oop_field_load</span><span class="params">(oop* field)</span> </span>&#123;</span><br><span class="line">    pre_load_barrier(field); <span class="comment">// 读屏障-读取前操作</span></span><br><span class="line">    <span class="keyword">return</span> *field;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>读屏障是直接针对第一步：<code>var G = objE.fieldG;</code>，当读取成员变量时，一律记录下来：</p>
+<figure class="highlight c++"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">void</span> <span class="title">pre_load_barrier</span><span class="params">(oop* field, oop old_value)</span> </span>&#123;  </span><br><span class="line">  <span class="keyword">if</span>($gc_phase == GC_CONCURRENT_MARK &amp;&amp; !isMarkd(field)) &#123;</span><br><span class="line">      oop old_value = *field;</span><br><span class="line">      remark_set.add(old_value); <span class="comment">// 记录读取到的对象</span></span><br><span class="line">  &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>这种做法是保守的，但也是安全的。</p>
+</blockquote>
+<blockquote>
+<p><code>Write barrier</code>是对“对引用类型字段赋值”这个动作的环切，也就是说赋值的前后都在barrier覆盖的范畴内。在赋值前的部分的<code>write barrier</code>叫做<code>pre-write barrier</code>，在赋值后的则叫做<code>post-write barrier</code>。</p>
+<p>在<code>HotSpot VM</code>里，在引入G1 GC之前，其它GC都只用了<code>post-write barrier</code>（如CMS只记录了引用新值），所以它在源码里没有特别的前后缀。</p>
+<p><strong><code>Pre/post-write barrier</code>跟<code>SATB</code>有啥关系呢？</strong></p>
+<p>前面提到<code>SATB</code>要维持“在<code>GC</code>开始时活的对象”的状态这个逻辑<code>snapshot</code>。</p>
+<p>除了从<code>root</code>出发把整个对象图<code>mark</code>下来之外，其实只需要用<code>pre-write barrier</code>把每次引用关系变化时旧的引用值记下来就好了。这样，等<code>concurrent marker</code>到达某个对象时，这个对象的所有引用类型字段的变化全都有记录在案，就不会漏掉任何在<code>snapshot</code>里活的对象。当然，很可能有对象在<code>snapshot</code>中是活的，但随着并发GC的进行它可能本来已经死了，但<code>SATB</code>还是会让它活过这次<code>GC</code>。</p>
+<figure class="highlight c++"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">void</span> <span class="title">oop_field_store</span><span class="params">(oop* field, oop new_value)</span> </span>&#123;  </span><br><span class="line">  pre_write_barrier(field);             <span class="comment">// pre-write barrier: for maintaining SATB invariant  </span></span><br><span class="line">  *field = new_value;                   <span class="comment">// the actual store  </span></span><br><span class="line">  post_write_barrier(field, new_value); <span class="comment">// post-write barrier: for tracking cross-region reference  </span></span><br><span class="line">&#125;  </span><br></pre></td></tr></table></figure>
+
+<p>在每次引用关系发生变化时，旧的引用所指向的对象就会被mark上，其子孙也会被递归mark上，这样就不会漏mark任何对象，snapshot的完整性也就得到了保证。</p>
+<p><strong>注：</strong></p>
+<p><strong>CMS的<code>incremental update</code>设计使得它在<code>remark</code>阶段必须重新扫描所有线程栈和整个<code>young gen</code>作为<code>root</code>；</strong></p>
+<p><strong>G1的<code>SATB</code>设计在<code>remark</code>阶段则只需要扫描剩下的<code>satb_mark_queue</code>。</strong></p>
+<p><strong>以<code>SATB</code> <code>write barrier</code>为例，每个Java线程有一个独立的、定长的<code>SATBMarkQueue</code>，<code>mutator</code>在barrier里只把<code>old_value</code>压入该队列中。一个队列满了之后，它就会被加到全局的SATB队列集合<code>SATBMarkQueueSet</code>里等待处理，然后给对应的Java线程换一个新的、干净的队列继续执行下去。</strong></p>
+<p><strong>并发标记（<code>concurrent marker</code>）会定期检查全局<code>SATB</code>队列集合的大小。当全局集合中队列数量超过一定阈值后，<code>concurrent marker</code>就会处理集合里的所有队列：把队列里记录的每个<code>oop</code>都标记上，并将其引用字段压到标记栈（marking stack）上等后面做进一步标记。</strong></p>
+</blockquote>
 <h4 id="Post-Write-Barrier"><a href="#Post-Write-Barrier" class="headerlink" title="Post-Write Barrier"></a><code>Post-Write Barrier</code></h4><p>为了在应用程序<strong>运行期间</strong>维护<code>RSets</code>, 任何时候对引用的更新都会触发一个<code>Post-Write屏障</code>。如果关联的引用是跨region的，比如从一个<code>region</code>到另一个<code>region</code>，一个对应的记录也会在目标region的<code>RSet</code>中添加。 将记录（<code>cards</code>）加入到RSet是异步的并应用了很多优化。</p>
 <p>简单来说它用<code>Write</code>屏障来将脏记录放到本地<code>buffer</code>中， 一个特殊的GC线程会选择这些记录,然后传播信息给其他<code>region</code>的<code>RSet</code>。</p>
 <h4 id="Pre-Write-Barrier"><a href="#Pre-Write-Barrier" class="headerlink" title="Pre-Write Barrier"></a><code>Pre-Write Barrier</code></h4><blockquote>
@@ -774,8 +849,8 @@
 <p>译文：</p>
 <p>…如果该条目已经被标记（<code>dirty</code>），则不执行任何操作。 这减少了多个存储到同一个<code>card</code>的工作，这是常见的情况，因为初始化了写操作。 如果<code>card Table</code>的<code>entry节点</code>没有标记，则进行标记，并将指向该card的指针<code>enqueued</code>到线程的<code>RSets Log</code>中。 如果此队列填充了<code>当前线程的日志缓冲区</code>（默认情况下包含256个元素），则将该缓冲区放入<code>全局填充缓冲区</code>集中，并分配一个新的空缓冲区。</p>
 <p>​    并发的<code>RSets</code>线程（在条件变量上）等待已填充的<code>RS buffer Set</code>的大小达到可配置的初始化阈值（默认为5个缓冲区）。<code>RSet</code>线程将已填充的缓冲区作为<code>队列</code>进行处理，直到队列的长度减少到启动阈值的1/4。对于每个缓冲区，它处理每个<code>Card Table</code>的 <code>pointer entry</code>。一些<code>card</code>很热（操作频繁），它们包含经常写入的位置。<strong>为避免重复处理热card</strong>，我们尝试识别最热的卡，然后将其处理推迟到下一个<code>疏散暂停</code>时（有关疏散暂停的说明，请参阅第2.3节）。我们用第二个<code>Card Table</code>完成此操作，该表记录了自上次疏散暂停以来卡片被标记的次数（在此期间，该表（如卡片表一样）被清除了）。处理card时，我们会在此表中增加其数量。如果计数超过热点阈值（默认值为4），则将card添加到称为热Queue（默认大小为1 K）的循环缓冲区。在每个疏散暂停开始时，该队列都像日志缓冲区一样进行处理，因此在结束时为空。如果循环缓冲区已满，则从另一端收回card并进行处理。</p>
-<p>​    因此，如果并发RSet线程尚未达到热度阈值，或者从热Queue中驱逐，则该进程会处理该Card。 为了处理Card，线程rst会将相应的Card Table Entry重置为净值，以便对Card上的对象进行的任何并发修改都将重新标记Card。 然后，它检查所有对象的指针字段，这些对象的修改可能会使卡被标记，寻找包含堆区之外的指针。 如果找到了这样的指针，则将Card插入到所记住的被引用Region中。</p>
-<p>​    当空闲处理器存在时，我们仅使用一个并发RSet线程来引入并行性。 但是，如果此线程不足以服务于突变率，则已填充的RS buffer set将变得太大。 我们限制这个集合的大小； 试图添加更多缓冲区的mutator线程自己处理RSet。</p>
+<p>​    因此，如果并发<code>RSet</code>线程尚未达到热度阈值，或者从<code>热Queue</code>中驱逐，则该进程会处理该<code>Card</code>。 为了处理<code>Card</code>，线程rst会将相应的<code>Card Table Entry</code>重置为净值，以便对<code>Card</code>上的对象进行的任何并发修改都将重新标记<code>Card</code>。 然后，它检查所有对象的指针字段，这些对象的修改可能会使卡被标记，寻找包含堆区之外的指针。 如果找到了这样的指针，则将Card插入到所记住的被引用<code>Region</code>中。</p>
+<p>​    当空闲处理器存在时，我们仅使用一个并发<code>RSet</code>线程来引入并行性。 但是，如果此线程不足以服务于突变率，则已填充的<code>RS buffer set</code>将变得太大。 我们限制这个集合的大小； 试图添加更多缓冲区的<code>mutator</code>线程自己处理RSet。</p>
 </blockquote>
 <h5 id="赋值"><a href="#赋值" class="headerlink" title="赋值"></a><strong>赋值</strong></h5><p><a href="https://en.wikipedia.org/wiki/Write_barrier" target="_blank" rel="noopener">Write barrier</a></p>
 <p>在<strong>赋值</strong>动作（<code>object.a = xxx</code>）的前后，<code>JVM</code>插入一个<code>pre-write barrier</code>和<code>post-write barrier</code>，其中<code>post-write barrier</code>的最终动作如下：</p>
@@ -794,6 +869,7 @@
 <p><img src="http://qd2x6jysb.bkt.clouddn.com/image-20200727211125384.png" alt="image-20200727211125384"></p>
 <h3 id="Collection-Set（增量解决问题：CSet）"><a href="#Collection-Set（增量解决问题：CSet）" class="headerlink" title="Collection Set（增量解决问题：CSet）"></a>Collection Set（增量解决问题：CSet）</h3><p>它记录了<code>GC</code>要收集的<code>Region</code>集合，集合里的<code>Region</code>可以是任意年代的。</p>
 <p>在<code>GC</code>的时候，对于<code>old-&gt;young</code>和<code>old-&gt;old</code>的跨代对象引用，只要扫描对应的<code>CSet</code>中的<code>RSet</code>即可，同时，在这些区块中的对象会被复制到其他区块中，总体上 <code>Collection Sets</code> 消耗的内存小于 <code>1%</code>。</p>
+<p>在<code>CSet</code>中存活的数据会在<code>GC</code>过程中被移动到另一个可用分区，<code>CSet</code>中的分区可以来自<code>Eden</code>空间、<code>survivor</code>空间、或者老年代。</p>
 <h3 id="CardTable（记录扫描跨代引用内存区域）"><a href="#CardTable（记录扫描跨代引用内存区域）" class="headerlink" title="CardTable（记录扫描跨代引用内存区域）"></a><strong>CardTable（记录扫描跨代引用内存区域）</strong></h3><p><strong>是RSet的实现方式，使用字节数组来实现card的记录，每个card对应该数组里的一个bit或一个byte。</strong></p>
 <p>由于<code>新生代GC</code>时，需要扫描整个<code>Old区</code>，效率很低。同时，倘若引用的对象很多，赋值器需要对每个引用做处理，赋值器开销会很大，为了解决赋值器开销这个问题，在G1 中又引入了另外一个概念，卡表（<code>Card Table</code>）。</p>
 <p>一个<code>Card Table</code>将一个分区在逻辑上划分为固定大小的连续区域，每个区域称之为卡。卡通常较小，介于<code>128到512字节</code>之间。<code>Card Table</code>通常为<strong>字节数组</strong>，由<code>Card</code>的索引（即数组下标）来标识每个分区的空间地址。</p>
@@ -803,6 +879,13 @@
 <p>来个浅显易懂的总结：</p>
 <p><img src="http://qd2x6jysb.bkt.clouddn.com/image-20200729144633310.png" alt="image-20200729144633310"></p>
 <p><code>cardtable</code>实际上是一个bit 数组, 标记了<code>GEN1</code>内存（比如分为1个4KB为单位的block）， 如果bit位被置位1（表示为红色）那就说明这个范围的内存是<code>Dirty</code>的（含有对更年轻对象的引用）。有了这个<code>table</code>后，我们在做<code>GC</code>时, 不止考虑<code>GEN0</code>的<code>GCROOTS</code>, 那些<code>CardTable</code> 中<code>Dirty block</code>中的所有对象都被认为是<code>GCROOTS</code>。</p>
+<blockquote>
+<p><code>G1</code> <code>GC</code>则是在<code>points-out</code>的<code>card table</code>之上再加了一层结构来构成<code>points-into</code> <code>RSet</code>：</p>
+<p>每个<code>region</code>会记录下到底哪些别的region有指向自己的指针，而这些指针分别在哪些card的范围内。</p>
+<p> 这个<code>RSet</code>其实是一个<code>hash table</code>，<code>key</code>是别的<code>region</code>的起始地址，<code>value</code>是一个集合，里面的元素是<code>card table</code>的<code>index</code>。 </p>
+<p>举例来说，如果<code>region A</code>的<code>RSet</code>里有一项的<code>key</code>是<code>region B</code>，<code>value</code>里有<code>index</code>为1234的<code>card</code>，它的意思就是<code>region B</code>的一个<code>card</code>里有引用指向<code>region A</code>。</p>
+<p>所以对<code>region A</code>来说，该<code>RSet</code>记录的是<code>points-into</code>的关系；而<code>card table</code>仍然记录了<code>points-out</code>的关系。</p>
+</blockquote>
 <p><strong><code>RSet</code>和<code>CardTable</code>用来避免<code>YoungGC</code>全部扫描老年代对象。</strong></p>
 <h3 id="Refine线程"><a href="#Refine线程" class="headerlink" title="Refine线程"></a>Refine线程</h3><p><code>Refine</code>线程是G1新引入的并发线程池，线程默认数目为<code>G1ConcRefinementThreads+1</code>，它分为两大功能：</p>
 <ul>
@@ -839,9 +922,28 @@
 </li>
 </ul>
 <h2 id="调优"><a href="#调优" class="headerlink" title="调优"></a>调优</h2><blockquote>
-<p>推荐：<a href="https://docs.oracle.com/javase/9/gctuning/garbage-first-garbage-collector-tuning.htm#JSGCT-GUID-90E30ACA-8040-432E-B3A0-1E0440AB556A" target="_blank" rel="noopener">10 Garbage-First Garbage Collector Tuning</a>（来自Oracle的干货，没有之一）</p>
+<p>推荐：<a href="https://docs.oracle.com/javase/9/gctuning/garbage-first-garbage-collector-tuning.htm#JSGCT-GUID-90E30ACA-8040-432E-B3A0-1E0440AB556A" target="_blank" rel="noopener">10 Garbage-First Garbage Collector Tuning</a>（来自<code>Oracle</code>的干货，没有之一）</p>
 </blockquote>
-<h3 id="XX-MaxGCPauseMillis-200（建立G1停顿预测模型）"><a href="#XX-MaxGCPauseMillis-200（建立G1停顿预测模型）" class="headerlink" title="-XX:MaxGCPauseMillis=200（建立G1停顿预测模型）"></a><code>-XX:MaxGCPauseMillis=200</code>（建立G1停顿预测模型）</h3><p><strong>提高吞吐量</strong></p>
+<h3 id="调优建议"><a href="#调优建议" class="headerlink" title="调优建议"></a>调优建议</h3><ol>
+<li><p><strong>不要自己显式设置新生代的大小</strong>（用<code>Xmn</code>或<code>-XX:NewRatio</code>参数），如果显式设置新生代的大小，会导致目标时间这个参数失效。</p>
+</li>
+<li><p>由于G1收集器自身已经有一套预测和调整机制了，因此我们首先的选择是相信它，即调整<code>-XX:MaxGCPauseMillis=N</code>参数，这也符合<code>G1</code>的目的——让<code>GC</code>调优尽量简单，这里有个取舍：</p>
+<p>如果<strong>减小这个参数的值，就意味着会调小新生代的大小</strong>，也会导致新生代<code>GC</code>发生得更频繁，同时，还会导致混合收集周期中回收的老年代分区减少，从而增加<code>FULL GC</code>的风险。这个时间设置得越短，应用的吞吐量也会受到影响。</p>
+</li>
+<li><p>针对<strong>混合垃圾收集的调优</strong>。如果调整这期望的最大暂停时间这个参数还是无法解决问题，即在日志中仍然可以看到FULL GC的现象，那么就需要自己手动做一些调整，可以做的调整包括：</p>
+</li>
+</ol>
+<ul>
+<li><strong>调整G1垃圾收集的后台线程数</strong>，通过设置<code>-XX:ConcGCThreads=n</code>这个参数，可以增加后台标记线程的数量，帮G1赢得这场你追我赶的游戏；</li>
+<li><strong>调整G1垃圾收集器并发周期的频率</strong>，如果让G1更早得启动垃圾收集，也可以帮助G1赢得这场比赛，那么可以通过设置<code>-XX:InitiatingHeapOccupancyPercent</code>这个参数来实现这个目标，如果将这个参数调小，G1就会更早得触发并发垃圾收集周期。这个值需要谨慎设置：如果这个参数设置得太高，会导致FULL GC出现得频繁；如果这个值设置得过小，又会导致G1频繁得进行并发收集，白白浪费CPU资源。通过GC日志可以通过一个点来判断GC是否正常——在一轮并发周期结束后，需要确保堆剩下的空间小于<code>InitiatingHeapOccupancyPercent</code>的值。</li>
+<li><strong>调整<code>G1</code>垃圾收集器的混合收集的工作量</strong>，即在一次混合垃圾收集中尽量多处理一些分区，可以从另外一方面提高混合垃圾收集的频率。在一次混合收集中可以回收多少分区，取决于三个因素：<ul>
+<li>（1）有多少个分区被认定为垃圾分区，<code>-XX:G1MixedGCLiveThresholdPercent=n</code>这个参数表示如果一个分区中的存活对象比例超过n，就不会被挑选为垃圾分区，因此可以通过这个参数控制每次混合收集的分区个数，这个参数的值越大，某个分区越容易被当做是垃圾分区；</li>
+<li>（2）<code>G1</code>在一个并发周期中，最多经历几次混合收集周期，这个可以通过<code>-XX:G1MixedGCCountTarget=n</code>设置，默认是8，如果减小这个值，可以增加每次混合收集收集的分区数，但是可能会导致停顿时间过长；</li>
+<li>（3）期望的GC停顿的最大值，由<code>MaxGCPauseMillis</code>参数确定，默认值是<code>200ms</code>，在混合收集周期内的停顿时间是向上规整的，如果实际运行时间比这个参数小，那么<code>G1</code>就能收集更多的分区。</li>
+</ul>
+</li>
+</ul>
+<h3 id="参数"><a href="#参数" class="headerlink" title="参数"></a>参数</h3><h4 id="XX-MaxGCPauseMillis-200（建立G1停顿预测模型）"><a href="#XX-MaxGCPauseMillis-200（建立G1停顿预测模型）" class="headerlink" title="-XX:MaxGCPauseMillis=200（建立G1停顿预测模型）"></a><code>-XX:MaxGCPauseMillis=200</code>（建立G1停顿预测模型）</h4><p><strong>提高吞吐量</strong></p>
 <blockquote>
 <p>​    If you prefer high throughput, then relax the pause-time goal by using <code>-XX:MaxGCPauseMillis</code> or provide a larger heap. If latency is the main requirement, then modify the pause-time target. <strong>Avoid limiting the young generation size to particular value</strong>s by using options like <code>-Xmn</code>, <code>-XX:NewRatio</code> and others because the young generation size is the main means for G1 to allow it to meet the pause-time. Setting the young generation size to a single value overrides and practically disables pause-time control.</p>
 </blockquote>
@@ -862,11 +964,24 @@
 <li>如果<code>MaxGCPauseMillis</code>设置的<strong>过小</strong>，那么GC就会频繁，吞吐量就会下降。</li>
 <li>如果<code>MaxGCPauseMillis</code>设置的<strong>过大</strong>，应用程序暂停时间就会变长。G1的默认暂停时间是200毫秒，我们可以从这里入手，调整合适的时间。</li>
 </ul>
-<h3 id="XX-G1HeapRegionSize-n设置G1区域大小"><a href="#XX-G1HeapRegionSize-n设置G1区域大小" class="headerlink" title="-XX:G1HeapRegionSize=n设置G1区域大小"></a><code>-XX:G1HeapRegionSize=n</code>设置G1区域大小</h3><p>设置的 G1 区域的大小。值是 2 的幂，范围是 1 MB 到 32 MB 之间。</p>
+<h4 id="XX-G1HeapRegionSize-n设置G1区域大小"><a href="#XX-G1HeapRegionSize-n设置G1区域大小" class="headerlink" title="-XX:G1HeapRegionSize=n设置G1区域大小"></a><code>-XX:G1HeapRegionSize=n</code>设置G1区域大小</h4><p>设置的 G1 区域的大小。值是 2 的幂，范围是 1 MB 到 32 MB 之间。</p>
 <p>目标是根据最小的 Java 堆大小划分出约 <code>2048</code> 个区域。</p>
-<h3 id="XX-ParallelGCThreads-n设置STW工作线程个数"><a href="#XX-ParallelGCThreads-n设置STW工作线程个数" class="headerlink" title="-XX:ParallelGCThreads=n设置STW工作线程个数"></a><code>-XX:ParallelGCThreads=n</code>设置STW工作线程个数</h3><p>设置并行标记的线程数。将 n 设置为并行垃圾回收线程数 (<code>ParallelGCThreads</code>) 的 1/4 左右。</p>
-<h3 id="XX-InitiatingHeapOccupancyPercent-45设置触发标记周期的堆占用率阀值"><a href="#XX-InitiatingHeapOccupancyPercent-45设置触发标记周期的堆占用率阀值" class="headerlink" title="-XX:InitiatingHeapOccupancyPercent=45设置触发标记周期的堆占用率阀值"></a><code>-XX:InitiatingHeapOccupancyPercent=45</code>设置触发标记周期的堆占用率阀值</h3><p>设置触发并发标记周期的 Java 堆占用率阈值。</p>
+<h4 id="XX-ParallelGCThreads-n设置STW工作线程个数"><a href="#XX-ParallelGCThreads-n设置STW工作线程个数" class="headerlink" title="-XX:ParallelGCThreads=n设置STW工作线程个数"></a><code>-XX:ParallelGCThreads=n</code>设置STW工作线程个数</h4><p>设置并行标记的线程数。将 n 设置为并行垃圾回收线程数 (<code>ParallelGCThreads</code>) 的 1/4 左右。</p>
+<h4 id="XX-InitiatingHeapOccupancyPercent-45设置触发标记周期的堆占用率阀值"><a href="#XX-InitiatingHeapOccupancyPercent-45设置触发标记周期的堆占用率阀值" class="headerlink" title="-XX:InitiatingHeapOccupancyPercent=45设置触发标记周期的堆占用率阀值"></a><code>-XX:InitiatingHeapOccupancyPercent=45</code>设置触发标记周期的堆占用率阀值</h4><p>设置触发并发标记周期的 Java 堆占用率阈值。</p>
 <p>默认占用率是整个 Java 堆的 <code>45%</code>。</p>
+<h2 id="问题"><a href="#问题" class="headerlink" title="问题"></a>问题</h2><h3 id="1）ParallelGCThreads和ConcGCThreads的区别？"><a href="#1）ParallelGCThreads和ConcGCThreads的区别？" class="headerlink" title="1）ParallelGCThreads和ConcGCThreads的区别？"></a>1）<code>ParallelGCThreads</code>和<code>ConcGCThreads</code>的区别？</h3><p><code>ParallelGCThreads</code>指得是<strong>在<code>STW</code>阶段</strong>，<strong>并行执行垃圾收集动作的线程数</strong>，<code>ParallelGCThreads</code>的值一般等于<strong>逻辑CPU核数</strong>，如果<strong>CPU核数大于8</strong>，则设置为<code>5/8 * cpus</code>，在SPARC等大型机上这个系数是<code>5/16</code>；</p>
+<p><code>ConcGCThreads</code>指的是在<strong>并发标记阶段</strong>，<strong>并发执行标记的线程数</strong>，一般设置为<code>ParallelGCThreads</code>的<code>1/4</code>。</p>
+<h3 id="2）write-barrier在GC中的作用？如何理解G1-GC中write-barrier的作用？"><a href="#2）write-barrier在GC中的作用？如何理解G1-GC中write-barrier的作用？" class="headerlink" title="2）write barrier在GC中的作用？如何理解G1 GC中write barrier的作用？"></a>2）<code>write barrier</code>在<code>GC</code>中的作用？如何理解<code>G1 GC</code>中<code>write barrier</code>的作用？</h3><p>写屏障是一种内存管理机制，用在这样的场景：当代码尝试修改一个对象的引用时，在前面放上写屏障就意味着将这个对象放在了写屏障后面。</p>
+<p><code>write barrier</code>在GC中的作用有点复杂，我们这里以<code>trace GC</code>算法为例讲下：<code>trace GC</code>有些算法是并发的，例如<code>CMS</code>和<code>G1</code>，即用户线程和垃圾收集线程可以同时运行，即<code>mutator</code>一边跑，<code>collector</code>一边收集。这里有一个限制是：</p>
+<p>黑色的对象不应该指向任何白色的对象。如果<code>mutator</code>视图让一个黑色的对象指向一个白色的对象，这个限制就会被打破，然后<code>GC</code>就会失败。针对这个问题有两种解决思路：</p>
+<p>（1）通过添加<code>read barriers</code>阻止<code>mutator</code>看到白色的对象；</p>
+<p>（2）通过<code>write barrier</code>阻止<code>mutator</code>修改一个黑色的对象，让它指向一个白色的对象。</p>
+<p><strong><code>write barrier</code>的解决方法</strong>：将黑色的对象放到写<code>write barrier</code>后面。</p>
+<p>如果真得发生了<code>white-on-black</code>这种写需求，一般也有多种修正方法：</p>
+<p>增量得将白色的对象变灰，将黑色的对象重新置灰等等。（<strong>增量的变灰</strong>就是CMS和G1里并发标记的过程，<strong>将黑色的对象重新变灰</strong>就是利用卡表或SATB的缓冲区将黑色的对象重新置灰的过程，当然会在重新标记中将所有灰色的对象处理掉）</p>
+<h3 id="3）G1里在并发标记的时候，如果有对象的引用修改，要将旧的值写到一个缓冲区中，这个动作前后会有一个write-barrier，这段可否细说下？"><a href="#3）G1里在并发标记的时候，如果有对象的引用修改，要将旧的值写到一个缓冲区中，这个动作前后会有一个write-barrier，这段可否细说下？" class="headerlink" title="3）G1里在并发标记的时候，如果有对象的引用修改，要将旧的值写到一个缓冲区中，这个动作前后会有一个write barrier，这段可否细说下？"></a>3）G1里在并发标记的时候，如果有对象的引用修改，要将旧的值写到一个缓冲区中，这个动作前后会有一个<code>write barrier</code>，这段可否细说下？</h3><p>这块涉及到<code>SATB</code>标记算法的原理，<code>SATB</code>是指<code>start at the beginning</code>，即在并发收集周期的第一个阶段（<strong>初始标记</strong>）是<code>STW</code>的，会给所有的分区做个快照，后面的扫描都是按照这个快照进行；</p>
+<p>在并发标记周期的第二个阶段，<strong>并发标记</strong>，这是收集线程和应用线程同时进行的，这时候应用线程就可能修改了某些引用的值，导致上面那个快照不是完整的，因此G1就想了个办法：把在这个期间对对象引用的修改都记录动作都记录下来（<code>RSet+CardTable</code>），然后在<strong>最终标记</strong>的时候拿到快照进行进一步处理。</p>
+<hr>
 <blockquote>
 <p>好书推荐：</p>
 <p><a href="http://www.narihiro.info/g1gc-impl-book/" target="_blank" rel="noopener">《徹底解剖「G1GC」実装編》</a></p>
@@ -874,6 +989,7 @@
 </blockquote>
 <blockquote>
 <p>参考：</p>
+<p><a href="https://www.infoq.com/articles/tuning-tips-G1-GC/" target="_blank" rel="noopener">Tips for Tuning the Garbage First Garbage Collector</a></p>
 <p>《JVM G1源码分析和调优》</p>
 <p><a href="http://psy-lob-saw.blogspot.com/2014/10/the-jvm-write-barrier-card-marking.html" target="_blank" rel="noopener">The JVM Write Barrier - Card Marking</a></p>
 <p><a href="https://docs.oracle.com/javase/9/gctuning/garbage-first-garbage-collector-tuning.htm#JSGCT-GUID-90E30ACA-8040-432E-B3A0-1E0440AB556A" target="_blank" rel="noopener">10 Garbage-First Garbage Collector Tuning</a></p>
@@ -941,7 +1057,7 @@
   <div class="post-catalog" id="catalog">
     <div class="title">目录</div>
     <div class="catalog-content">
-      <ol class="toc"><li class="toc-item toc-level-2"><a class="toc-link" href="#区别"><span class="toc-text">区别</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#内存划分"><span class="toc-text">内存划分</span></a><ol class="toc-child"><li class="toc-item toc-level-3"><a class="toc-link" href="#分区类型分为？"><span class="toc-text">分区类型分为？</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#Heap-Region大小确定方式？"><span class="toc-text">Heap Region大小确定方式？</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#如果G1是启发式推断新生代的大小，那么当新生代变化时该如何实现？"><span class="toc-text">如果G1是启发式推断新生代的大小，那么当新生代变化时该如何实现？</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#分配新的分区时，何时扩展？一次扩展多少内存？"><span class="toc-text">分配新的分区时，何时扩展？一次扩展多少内存？</span></a></li></ol></li><li class="toc-item toc-level-2"><a class="toc-link" href="#对象分配"><span class="toc-text">对象分配</span></a><ol class="toc-child"><li class="toc-item toc-level-3"><a class="toc-link" href="#主流程"><span class="toc-text">主流程</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#TLAB内存分配"><span class="toc-text">TLAB内存分配</span></a><ol class="toc-child"><li class="toc-item toc-level-4"><a class="toc-link" href="#快速无锁分配"><span class="toc-text">快速无锁分配</span></a></li><li class="toc-item toc-level-4"><a class="toc-link" href="#慢速分配"><span class="toc-text">慢速分配</span></a></li></ol></li><li class="toc-item toc-level-3"><a class="toc-link" href="#堆慢速内存分配"><span class="toc-text">堆慢速内存分配</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#大对象分配"><span class="toc-text">大对象分配</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#最后的分配尝试"><span class="toc-text">最后的分配尝试</span></a></li></ol></li><li class="toc-item toc-level-2"><a class="toc-link" href="#GC模式"><span class="toc-text">GC模式</span></a><ol class="toc-child"><li class="toc-item toc-level-3"><a class="toc-link" href="#参数配置"><span class="toc-text">参数配置</span></a></li></ol></li><li class="toc-item toc-level-2"><a class="toc-link" href="#收集过程"><span class="toc-text">收集过程</span></a><ol class="toc-child"><li class="toc-item toc-level-3"><a class="toc-link" href="#Young-GC"><span class="toc-text">Young GC</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#Old-GC"><span class="toc-text">Old GC</span></a><ol class="toc-child"><li class="toc-item toc-level-4"><a class="toc-link" href="#那么什么时候会启动并发标记周期呢（Global-concurrent-marking）？"><span class="toc-text">那么什么时候会启动并发标记周期呢（Global concurrent marking）？</span></a></li><li class="toc-item toc-level-4"><a class="toc-link" href="#初始标记（Initial-Marking）"><span class="toc-text">初始标记（Initial Marking）</span></a><ol class="toc-child"><li class="toc-item toc-level-5"><a class="toc-link" href="#TAMS是什么？"><span class="toc-text">TAMS是什么？</span></a></li></ol></li><li class="toc-item toc-level-4"><a class="toc-link" href="#根区域扫描（Root-Region-Scan）"><span class="toc-text">根区域扫描（Root Region Scan）</span></a><ol class="toc-child"><li class="toc-item toc-level-5"><a class="toc-link" href="#作用？"><span class="toc-text">作用？</span></a></li></ol></li><li class="toc-item toc-level-4"><a class="toc-link" href="#并发标记（Concurrent-Marking）"><span class="toc-text">并发标记（Concurrent Marking）</span></a></li><li class="toc-item toc-level-4"><a class="toc-link" href="#最终-重新标记（Final-Marking）"><span class="toc-text">最终&#x2F;重新标记（Final Marking）</span></a></li><li class="toc-item toc-level-4"><a class="toc-link" href="#筛选清除（Live-Data-Counting-and-Cleanup）"><span class="toc-text">筛选清除（Live Data Counting and Cleanup）</span></a></li></ol></li><li class="toc-item toc-level-3"><a class="toc-link" href="#Evacuation（疏散暂停）"><span class="toc-text">Evacuation（疏散暂停）</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#混合式垃圾收集（Mixed-GC）"><span class="toc-text">混合式垃圾收集（Mixed GC）</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#Full-GC"><span class="toc-text">Full GC</span></a></li></ol></li><li class="toc-item toc-level-2"><a class="toc-link" href="#特点"><span class="toc-text">特点</span></a><ol class="toc-child"><li class="toc-item toc-level-3"><a class="toc-link" href="#可预测停顿-amp-追求停顿时间"><span class="toc-text">可预测停顿 &amp; 追求停顿时间</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#并行与并发"><span class="toc-text">并行与并发</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#空间整合"><span class="toc-text">空间整合</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#分代收集"><span class="toc-text">分代收集</span></a></li></ol></li><li class="toc-item toc-level-2"><a class="toc-link" href="#技术细节"><span class="toc-text">技术细节</span></a><ol class="toc-child"><li class="toc-item toc-level-3"><a class="toc-link" href="#内存区域不固定"><span class="toc-text">内存区域不固定</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#G1停顿预测模型（Pause-Prediction-Model）"><span class="toc-text">G1停顿预测模型（Pause Prediction Model）</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#跨代引用"><span class="toc-text">跨代引用</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#RSet（记忆集：Remember-Set）"><span class="toc-text">RSet（记忆集：Remember Set）</span></a><ol class="toc-child"><li class="toc-item toc-level-4"><a class="toc-link" href="#写屏障"><span class="toc-text">写屏障</span></a></li><li class="toc-item toc-level-4"><a class="toc-link" href="#Post-Write-Barrier"><span class="toc-text">Post-Write Barrier</span></a></li><li class="toc-item toc-level-4"><a class="toc-link" href="#Pre-Write-Barrier"><span class="toc-text">Pre-Write Barrier</span></a></li><li class="toc-item toc-level-4"><a class="toc-link" href="#管理RSet"><span class="toc-text">管理RSet</span></a></li><li class="toc-item toc-level-4"><a class="toc-link" href="#RSet实现过程"><span class="toc-text">RSet实现过程</span></a><ol class="toc-child"><li class="toc-item toc-level-5"><a class="toc-link" href="#赋值"><span class="toc-text">赋值</span></a></li><li class="toc-item toc-level-5"><a class="toc-link" href="#修改"><span class="toc-text">修改</span></a></li></ol></li></ol></li><li class="toc-item toc-level-3"><a class="toc-link" href="#Collection-Set（增量解决问题：CSet）"><span class="toc-text">Collection Set（增量解决问题：CSet）</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#CardTable（记录扫描跨代引用内存区域）"><span class="toc-text">CardTable（记录扫描跨代引用内存区域）</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#Refine线程"><span class="toc-text">Refine线程</span></a><ol class="toc-child"><li class="toc-item toc-level-4"><a class="toc-link" href="#工作原理"><span class="toc-text">工作原理</span></a></li><li class="toc-item toc-level-4"><a class="toc-link" href="#抽样线程"><span class="toc-text">抽样线程</span></a></li></ol></li></ol></li><li class="toc-item toc-level-2"><a class="toc-link" href="#缺陷"><span class="toc-text">缺陷</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#调优"><span class="toc-text">调优</span></a><ol class="toc-child"><li class="toc-item toc-level-3"><a class="toc-link" href="#XX-MaxGCPauseMillis-200（建立G1停顿预测模型）"><span class="toc-text">-XX:MaxGCPauseMillis&#x3D;200（建立G1停顿预测模型）</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#XX-G1HeapRegionSize-n设置G1区域大小"><span class="toc-text">-XX:G1HeapRegionSize&#x3D;n设置G1区域大小</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#XX-ParallelGCThreads-n设置STW工作线程个数"><span class="toc-text">-XX:ParallelGCThreads&#x3D;n设置STW工作线程个数</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#XX-InitiatingHeapOccupancyPercent-45设置触发标记周期的堆占用率阀值"><span class="toc-text">-XX:InitiatingHeapOccupancyPercent&#x3D;45设置触发标记周期的堆占用率阀值</span></a></li></ol></li></ol>
+      <ol class="toc"><li class="toc-item toc-level-2"><a class="toc-link" href="#区别"><span class="toc-text">区别</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#内存划分"><span class="toc-text">内存划分</span></a><ol class="toc-child"><li class="toc-item toc-level-3"><a class="toc-link" href="#分区类型分为？"><span class="toc-text">分区类型分为？</span></a><ol class="toc-child"><li class="toc-item toc-level-4"><a class="toc-link" href="#自由分区（Free-Heap-Region，FHR）"><span class="toc-text">自由分区（Free Heap Region，FHR）</span></a></li><li class="toc-item toc-level-4"><a class="toc-link" href="#新生代分区（Young-Heap-Region，YHR）"><span class="toc-text">新生代分区（Young Heap Region，YHR）</span></a></li><li class="toc-item toc-level-4"><a class="toc-link" href="#大对象分区（Humongous-Heap-Region，HHR，本质还是O区的）"><span class="toc-text">大对象分区（Humongous Heap Region，HHR，本质还是O区的）</span></a></li><li class="toc-item toc-level-4"><a class="toc-link" href="#老生代分区（Old-Heap-Region，OHR）"><span class="toc-text">老生代分区（Old Heap Region，OHR）</span></a></li></ol></li><li class="toc-item toc-level-3"><a class="toc-link" href="#Heap-Region大小确定方式？"><span class="toc-text">Heap Region大小确定方式？</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#如果G1是启发式推断新生代的大小，那么当新生代变化时该如何实现？"><span class="toc-text">如果G1是启发式推断新生代的大小，那么当新生代变化时该如何实现？</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#分配新的分区时，何时扩展？一次扩展多少内存？"><span class="toc-text">分配新的分区时，何时扩展？一次扩展多少内存？</span></a></li></ol></li><li class="toc-item toc-level-2"><a class="toc-link" href="#对象分配"><span class="toc-text">对象分配</span></a><ol class="toc-child"><li class="toc-item toc-level-3"><a class="toc-link" href="#主流程"><span class="toc-text">主流程</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#TLAB内存分配"><span class="toc-text">TLAB内存分配</span></a><ol class="toc-child"><li class="toc-item toc-level-4"><a class="toc-link" href="#快速无锁分配"><span class="toc-text">快速无锁分配</span></a></li><li class="toc-item toc-level-4"><a class="toc-link" href="#慢速分配"><span class="toc-text">慢速分配</span></a></li></ol></li><li class="toc-item toc-level-3"><a class="toc-link" href="#堆慢速内存分配"><span class="toc-text">堆慢速内存分配</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#大对象分配"><span class="toc-text">大对象分配</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#最后的分配尝试"><span class="toc-text">最后的分配尝试</span></a></li></ol></li><li class="toc-item toc-level-2"><a class="toc-link" href="#GC模式"><span class="toc-text">GC模式</span></a><ol class="toc-child"><li class="toc-item toc-level-3"><a class="toc-link" href="#参数配置"><span class="toc-text">参数配置</span></a></li></ol></li><li class="toc-item toc-level-2"><a class="toc-link" href="#收集过程"><span class="toc-text">收集过程</span></a><ol class="toc-child"><li class="toc-item toc-level-3"><a class="toc-link" href="#Young-GC"><span class="toc-text">Young GC</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#Old-GC"><span class="toc-text">Old GC</span></a><ol class="toc-child"><li class="toc-item toc-level-4"><a class="toc-link" href="#那么什么时候会启动并发标记周期呢（Global-concurrent-marking）？"><span class="toc-text">那么什么时候会启动并发标记周期呢（Global concurrent marking）？</span></a></li><li class="toc-item toc-level-4"><a class="toc-link" href="#初始标记（Initial-Marking）"><span class="toc-text">初始标记（Initial Marking）</span></a><ol class="toc-child"><li class="toc-item toc-level-5"><a class="toc-link" href="#TAMS是什么？"><span class="toc-text">TAMS是什么？</span></a></li></ol></li><li class="toc-item toc-level-4"><a class="toc-link" href="#根区域扫描（Root-Region-Scan）"><span class="toc-text">根区域扫描（Root Region Scan）</span></a><ol class="toc-child"><li class="toc-item toc-level-5"><a class="toc-link" href="#作用？"><span class="toc-text">作用？</span></a></li></ol></li><li class="toc-item toc-level-4"><a class="toc-link" href="#并发标记（Concurrent-Marking）"><span class="toc-text">并发标记（Concurrent Marking）</span></a></li><li class="toc-item toc-level-4"><a class="toc-link" href="#最终-重新标记（Final-Marking）"><span class="toc-text">最终&#x2F;重新标记（Final Marking）</span></a></li><li class="toc-item toc-level-4"><a class="toc-link" href="#筛选清除（Live-Data-Counting-and-Cleanup）"><span class="toc-text">筛选清除（Live Data Counting and Cleanup）</span></a></li></ol></li><li class="toc-item toc-level-3"><a class="toc-link" href="#Evacuation（疏散暂停）"><span class="toc-text">Evacuation（疏散暂停）</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#混合式垃圾收集（Mixed-GC）"><span class="toc-text">混合式垃圾收集（Mixed GC）</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#Full-GC"><span class="toc-text">Full GC</span></a></li></ol></li><li class="toc-item toc-level-2"><a class="toc-link" href="#特点"><span class="toc-text">特点</span></a><ol class="toc-child"><li class="toc-item toc-level-3"><a class="toc-link" href="#可预测停顿-amp-追求停顿时间"><span class="toc-text">可预测停顿 &amp; 追求停顿时间</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#并行与并发"><span class="toc-text">并行与并发</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#空间整合"><span class="toc-text">空间整合</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#分代收集"><span class="toc-text">分代收集</span></a></li></ol></li><li class="toc-item toc-level-2"><a class="toc-link" href="#技术细节"><span class="toc-text">技术细节</span></a><ol class="toc-child"><li class="toc-item toc-level-3"><a class="toc-link" href="#内存区域不固定"><span class="toc-text">内存区域不固定</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#G1停顿预测模型（Pause-Prediction-Model）"><span class="toc-text">G1停顿预测模型（Pause Prediction Model）</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#跨代引用"><span class="toc-text">跨代引用</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#RSet（记忆集：Remember-Set）"><span class="toc-text">RSet（记忆集：Remember Set）</span></a><ol class="toc-child"><li class="toc-item toc-level-4"><a class="toc-link" href="#写屏障"><span class="toc-text">写屏障</span></a></li><li class="toc-item toc-level-4"><a class="toc-link" href="#Post-Write-Barrier"><span class="toc-text">Post-Write Barrier</span></a></li><li class="toc-item toc-level-4"><a class="toc-link" href="#Pre-Write-Barrier"><span class="toc-text">Pre-Write Barrier</span></a></li><li class="toc-item toc-level-4"><a class="toc-link" href="#管理RSet"><span class="toc-text">管理RSet</span></a></li><li class="toc-item toc-level-4"><a class="toc-link" href="#RSet实现过程"><span class="toc-text">RSet实现过程</span></a><ol class="toc-child"><li class="toc-item toc-level-5"><a class="toc-link" href="#赋值"><span class="toc-text">赋值</span></a></li><li class="toc-item toc-level-5"><a class="toc-link" href="#修改"><span class="toc-text">修改</span></a></li></ol></li></ol></li><li class="toc-item toc-level-3"><a class="toc-link" href="#Collection-Set（增量解决问题：CSet）"><span class="toc-text">Collection Set（增量解决问题：CSet）</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#CardTable（记录扫描跨代引用内存区域）"><span class="toc-text">CardTable（记录扫描跨代引用内存区域）</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#Refine线程"><span class="toc-text">Refine线程</span></a><ol class="toc-child"><li class="toc-item toc-level-4"><a class="toc-link" href="#工作原理"><span class="toc-text">工作原理</span></a></li><li class="toc-item toc-level-4"><a class="toc-link" href="#抽样线程"><span class="toc-text">抽样线程</span></a></li></ol></li></ol></li><li class="toc-item toc-level-2"><a class="toc-link" href="#缺陷"><span class="toc-text">缺陷</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#调优"><span class="toc-text">调优</span></a><ol class="toc-child"><li class="toc-item toc-level-3"><a class="toc-link" href="#调优建议"><span class="toc-text">调优建议</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#参数"><span class="toc-text">参数</span></a><ol class="toc-child"><li class="toc-item toc-level-4"><a class="toc-link" href="#XX-MaxGCPauseMillis-200（建立G1停顿预测模型）"><span class="toc-text">-XX:MaxGCPauseMillis&#x3D;200（建立G1停顿预测模型）</span></a></li><li class="toc-item toc-level-4"><a class="toc-link" href="#XX-G1HeapRegionSize-n设置G1区域大小"><span class="toc-text">-XX:G1HeapRegionSize&#x3D;n设置G1区域大小</span></a></li><li class="toc-item toc-level-4"><a class="toc-link" href="#XX-ParallelGCThreads-n设置STW工作线程个数"><span class="toc-text">-XX:ParallelGCThreads&#x3D;n设置STW工作线程个数</span></a></li><li class="toc-item toc-level-4"><a class="toc-link" href="#XX-InitiatingHeapOccupancyPercent-45设置触发标记周期的堆占用率阀值"><span class="toc-text">-XX:InitiatingHeapOccupancyPercent&#x3D;45设置触发标记周期的堆占用率阀值</span></a></li></ol></li></ol></li><li class="toc-item toc-level-2"><a class="toc-link" href="#问题"><span class="toc-text">问题</span></a><ol class="toc-child"><li class="toc-item toc-level-3"><a class="toc-link" href="#1）ParallelGCThreads和ConcGCThreads的区别？"><span class="toc-text">1）ParallelGCThreads和ConcGCThreads的区别？</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#2）write-barrier在GC中的作用？如何理解G1-GC中write-barrier的作用？"><span class="toc-text">2）write barrier在GC中的作用？如何理解G1 GC中write barrier的作用？</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#3）G1里在并发标记的时候，如果有对象的引用修改，要将旧的值写到一个缓冲区中，这个动作前后会有一个write-barrier，这段可否细说下？"><span class="toc-text">3）G1里在并发标记的时候，如果有对象的引用修改，要将旧的值写到一个缓冲区中，这个动作前后会有一个write barrier，这段可否细说下？</span></a></li></ol></li></ol>
     </div>
   </div>
 

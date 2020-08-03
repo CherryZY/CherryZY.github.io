@@ -146,9 +146,13 @@
 <h2 id="收集过程"><a href="#收集过程" class="headerlink" title="收集过程"></a>收集过程</h2><p><img src="http://qd2x6jysb.bkt.clouddn.com/image-20200728010409132.png" alt="image-20200728010409132"></p>
 <h3 id="初始标记（STW-InitialMarking）"><a href="#初始标记（STW-InitialMarking）" class="headerlink" title="初始标记（STW, InitialMarking）"></a>初始标记（STW, InitialMarking）</h3><p><img src="http://qd2x6jysb.bkt.clouddn.com/image-20200729172826293.png" alt="image-20200729172826293"></p>
 <ul>
-<li>标记一下GC Root能直接关联到的对象；</li>
+<li>标记一下<code>GC Root</code>能直接关联到的对象；</li>
 <li>遍历新生代对象，标记可达的老年代对象；</li>
 </ul>
+<blockquote>
+<p>引自：<a href="http://citeseerx.ist.psu.edu/viewdoc/download;jsessionid=708077E17B9BF4DEB8C8A850D34C8D60?doi=10.1.1.22.8915&rep=rep1&type=pdf" target="_blank" rel="noopener">A Generational Mostly-concurrent Gabage Collector</a></p>
+<p>Initial  marking  pause.Suspend all mutators and record all ob-jects directly reachable from the roots ( globals, stacks, registers) of the system.</p>
+</blockquote>
 <h3 id="并发标记（Concurrent-Marking）"><a href="#并发标记（Concurrent-Marking）" class="headerlink" title="并发标记（Concurrent Marking）"></a>并发标记（Concurrent Marking）</h3><p><img src="http://qd2x6jysb.bkt.clouddn.com/image-20200729172839191.png" alt="image-20200729172839191"></p>
 <p>是<strong>主要标记过程</strong>，这个标记过程是和用户线程并发执行的。</p>
 <ul>
@@ -156,6 +160,20 @@
 <li>该阶段<strong>并发执行</strong>的，在运行期间可能发生新生代的对象晋升到老年代、或者是直接在老年代分配对象、或者更新老年代对象的引用关系等等，对于这些对象，都是需要进行重新标记的，否则有些对象就会被遗漏，发生<strong>漏标</strong>的情况。</li>
 </ul>
 <p>该阶段会把上述对象所在的<code>Card</code>标识为<code>Dirty</code>，后续只需扫描这些<code>Dirty Card</code>的对象，避免扫描整个老年代。（类似G1的处理）</p>
+<blockquote>
+<p>会产生“浮动垃圾”：</p>
+<p><strong>并发标记</strong> 时是并发的，GC 线程和用户线程并发执行，这个过程当然可能会因为线程的交替执行而导致新产生的垃圾（浮动垃圾）没有被标记到；</p>
+</blockquote>
+<blockquote>
+<p>参考：<a href="https://docs.oracle.com/javase/8/docs/technotes/guides/vm/gctuning/cms.html#sthref36" target="_blank" rel="noopener">https://docs.oracle.com/javase/8/docs/technotes/guides/vm/gctuning/cms.html#sthref36</a></p>
+<p>CMS收集器是一个跟踪收集器，它至少标识堆中的所有可访问对象。在Richard Jones和Rafael D. Lins的出版物《<em>垃圾收集：自动动态内存算法》中</em>，它是一个增量更新收集器。因为应用程序线程和垃圾收集器线程在主收集期间同时运行，所以垃圾收集器线程跟踪的对象随后可能在收集过程结束时变得不可访问。</p>
+<p>尚未回收的此类无法访问的对象称为<strong>浮动垃圾</strong>。<em>漂浮垃圾</em>量取决于并发收集周期的持续时间以及应用程序对参考更新（也称为<em>突变）</em>的频率。</p>
+<p>此外，由于年轻一代和终身一代是独立收集的，因此每个人都是彼此的根源。作为粗略的指导，请尝试将永久代的大小增加20％，以解决浮动垃圾的问题。在一个并发收集周期结束时，将在下一个收集周期中收集堆中的浮动垃圾。</p>
+</blockquote>
+<blockquote>
+<p>引自：<a href="http://citeseerx.ist.psu.edu/viewdoc/download;jsessionid=708077E17B9BF4DEB8C8A850D34C8D60?doi=10.1.1.22.8915&rep=rep1&type=pdf" target="_blank" rel="noopener">A Generational Mostly-concurrent Gabage Collector</a></p>
+<p>Concurrent marking phase.Resume mutator operation. At the same time, initiate a concurrent marking phase, which marks a transitive closure of reachable objects. This closure is not guaranteed to contain all objects reachable at the end of marking, since concurrent updates of reference fields by the mutator may have prevented the marking phase from reaching some live objects.To deal with this complication, the algorithm also arranges to keep track of updates to reference fields in heap objects. This is the only interaction between the mutator and the collector.</p>
+</blockquote>
 <h3 id="并发预处理（PreCleaning-amp-AbortablePreclean）"><a href="#并发预处理（PreCleaning-amp-AbortablePreclean）" class="headerlink" title="并发预处理（PreCleaning &amp; AbortablePreclean）"></a>并发预处理（PreCleaning &amp; AbortablePreclean）</h3><p><code>-XX:CMSPrecleaningEnabled</code>可关闭当前阶段，默认<strong>启用</strong>：</p>
 <ul>
 <li>标记从新生代晋升的对象、新分配到老年代的对象；</li>
@@ -168,7 +186,14 @@
 <li>处理 <code>From</code> 和 <code>To 区</code>的对象，标记可达的老年代对象；</li>
 <li>和上一个阶段一样，扫描处理<code>Dirty Card</code>中的对象；</li>
 </ol>
-<h3 id="重新标记（STW-Final-Remark）"><a href="#重新标记（STW-Final-Remark）" class="headerlink" title="重新标记（STW, Final Remark）"></a>重新标记（STW, Final Remark）</h3><p>为了修正并发标记期间因用户程序继续运作而导致标记产生变动的那一部分对象的标记记录（停顿时间比初始标记长，但比并发标记短得多）。（应用线程停顿期间标记所有的存活对象，处理弱引用，卸载无用class对象，清除拥有class级别元数据的符号和字符串表，和其内部的String）</p>
+<h3 id="重新标记（STW-Final-Remark）"><a href="#重新标记（STW-Final-Remark）" class="headerlink" title="重新标记（STW, Final Remark）"></a>重新标记（STW, Final Remark）</h3><p>为了<strong>修正并发标记期间因用户程序继续运作而导致标记产生变动的那一部分对象的标记记录</strong>（停顿时间比初始标记长，但比并发标记短得多）。（应用线程停顿期间标记所有的存活对象，处理弱引用，卸载无用class对象，清除拥有class级别元数据的符号和字符串表，和其内部的String）</p>
+<blockquote>
+<p>只是修正之前“并发标记”所获得的不可达对象，没办法处理“浮动垃圾”。</p>
+</blockquote>
+<blockquote>
+<p>引自：<a href="http://citeseerx.ist.psu.edu/viewdoc/download;jsessionid=708077E17B9BF4DEB8C8A850D34C8D60?doi=10.1.1.22.8915&rep=rep1&type=pdf" target="_blank" rel="noopener">A Generational Mostly-concurrent Gabage Collector</a></p>
+<p>Final marking pause.Suspend the mutators once again, and complete the marking phase by marking from the roots, considering modified reference fields in marked objects as additional roots. Since such fields contain the only references that the concurrent marking phasemay not have observed, this ensures that the final transitive closure includes all objects reachable at the start of the final marking phase.It may also include some objects that became unreachable after theywere marked. These will be collected during the next garbage collection cycle.</p>
+</blockquote>
 <h3 id="并发清理（Concurrent-Preclean）"><a href="#并发清理（Concurrent-Preclean）" class="headerlink" title="并发清理（Concurrent Preclean）"></a>并发清理（<strong>Concurrent Preclean</strong>）</h3><p>和用户线程并发执行的，基于标记结果来清理对象。</p>
 <blockquote>
 <p>​    This is again a concurrent phase, running in parallel with the application threads, not stopping them. While the previous phase was running concurrently with the application, some references were changed. Whenever that happens, the JVM marks the area of the heap (called “Card”) that contains the mutated object as “dirty”.</p>
@@ -182,6 +207,10 @@
 <p>​    在Preclean阶段，应对这些dirty对象进行处理，并标出从它们可触及的对象。 完成后，将清理card。</p>
 </blockquote>
 <p><img src="http://qd2x6jysb.bkt.clouddn.com/image-20200729180733788.png" alt="image-20200729180733788"></p>
+<blockquote>
+<p>引自：<a href="http://citeseerx.ist.psu.edu/viewdoc/download;jsessionid=708077E17B9BF4DEB8C8A850D34C8D60?doi=10.1.1.22.8915&rep=rep1&type=pdf" target="_blank" rel="noopener">A Generational Mostly-concurrent Gabage Collector</a></p>
+<p>Concurrent  sweeping  phase.Resume the mutators once again,and sweep concurrently over the heap, deal locating unmarked objects.Care must be taken not to deallocate newly-allocated objects. Thiscan be accomplished by allocating objects “live” (i.e., marked), at least during this phase.</p>
+</blockquote>
 <h3 id="并发重置（CMS-concurrent-reset）"><a href="#并发重置（CMS-concurrent-reset）" class="headerlink" title="并发重置（CMS-concurrent-reset）"></a>并发重置（CMS-concurrent-reset）</h3><p>收集器做一些收尾的工作，以便下一次 GC 周期能有一个干净的状态。</p>
 <h3 id="问题"><a href="#问题" class="headerlink" title="问题"></a>问题</h3><h4 id="如果在重新标记之前刚好发生了一次MinorGC，会不会导致重新标记阶段Stop-the-World时间太长？"><a href="#如果在重新标记之前刚好发生了一次MinorGC，会不会导致重新标记阶段Stop-the-World时间太长？" class="headerlink" title="如果在重新标记之前刚好发生了一次MinorGC，会不会导致重新标记阶段Stop the World时间太长？"></a>如果在重新标记之前刚好发生了一次MinorGC，会不会导致重新标记阶段Stop the World时间太长？</h4><p>不会的，在并发标记阶段其实还包括了一次并发的预清理阶段，虚拟机会主动等待年轻代发生垃圾回收，这样可以将重新标记对象引用关系的步骤放在并发标记阶段，有效降低重新标记阶段<code>STW</code>的时间。</p>
 <h2 id="指令参数"><a href="#指令参数" class="headerlink" title="指令参数"></a>指令参数</h2><table>
@@ -245,7 +274,9 @@
 <li><p>对<strong>CPU资源非常敏感</strong>，因为并发标记和并发清理阶段和用户线程一起运行，当CPU数变小时，性能容易出现问题，总吞吐量会降低。</p>
 </li>
 <li><p><strong>浮动垃圾</strong>（Floating Garbage）</p>
-<p>收集过程中会产生<strong>浮动垃圾</strong>，所以不可以在老年代内存不够用了才进行垃圾回收，必须提前进行垃圾收集。<br>通过参数<code>-XX:CMSInitiatingOccupancyFraction</code>的值来控制内存使用百分比。如果该值设置的太高，那么在CMS运行期间预留的内存可能无法满足程序所需，会出现<code>Concurrent Mode Failure</code>失败，之后会临时使用<code>Serial Old</code>收集器做为老年代收集器，会产生更长时间的停顿。</p>
+<p>收集过程中会产生<strong>浮动垃圾</strong>，所以不可以在老年代内存不够用了才进行垃圾回收，必须提前进行垃圾收集。</p>
+<p>通过参数<code>-XX:CMSInitiatingOccupancyFraction</code>的值来控制内存使用百分比。</p>
+<p>如果该值设置的太高，那么在CMS运行期间预留的内存可能无法满足程序所需，会出现<code>Concurrent Mode Failure</code>失败，之后会临时使用<code>Serial Old</code>收集器做为老年代收集器，会产生更长时间的停顿。</p>
 </li>
 </ul>
 <p>  由于在应用运行的同时进行垃圾回收，所以有些垃圾可能在垃圾回收进行完成时产生，这样就造成了“<strong>Floating Garbage</strong>”，这些垃圾需要在下次垃圾回收周期时才能回收掉。所以，并发收集器一般需要20%的预留空间用于这些浮动垃圾。</p>
@@ -273,6 +304,33 @@
 </ul>
 <p>注：</p>
 <p>在<code>CMS</code>中，也有<code>RSet</code>的概念，在老年代中有一块区域用来记录指向新生代的引用。这是一种<code>point-out</code>，在进行Young GC时，扫描根时，仅仅需要扫描这一块区域，而不需要扫描整个老年代。（G1是<code>point-in</code>）</p>
+<p>这里再引用下论文中提到CMS使用的卡表技术：</p>
+<blockquote>
+<p>4.2  Using the Card Table</p>
+<p>Generational garbage collection requires tracking of references from objectsin older generations to objects in younger generations.  This is necessary for correctness, since some young-generation objects may be unreachable except through such references. A better scheme than simply traversing the entire older generation is required, since that would make the work of a young-generation collection similar to the work of a collection of the entire heap.</p>
+<p>Several schemes for tracking such old-to-young references have been used,with different cost/accuracy trade offs. The generational framework of the ResearchVM (see Section 2) uses a card table for this tracking [34, 17, 33].A card table is an array of values, each entry corresponding to a subregion of the heap called acard. The system is arranged so that each update ofa reference field within a heap object by mutator code executes a write barrier that sets the card table entry corresponding to the card containing the reference field to adirty value. In compiled mutator code, the extra code for card table update can be quite efficient: a two-instruction write barrier proposed by H ̈olzle [16] is used.</p>
+<p>One of the fundamental decisions of our design is to exploit the happy coincidence that this efficient card-table-based write barrier can be used,almost without modification, to perform the reference update tracking required for mostly-concurrent collection. Thus, using mostly-concurrent collection for the old generation will add no extra mutator overhead beyondthat already incurred for the generational write barrier.Boehmet al.used virtual memory protection techniques to track pointer updates at virtual memory page granularity: a “dirty” page contains one ormore modified reference fields. Using a card-table-based write barrier hasseveral advantages over this approach.</p>
+<ul>
+<li><strong>Less  overhead</strong>.The cost of invoking a custom handler for memory protection traps is quite high in most operating systems. Hosk-ing and Moss [18] found a five-instruction card-marking barrier to bemore efficient than a page-protection-based barrier; the two- or three-instruction implementation used in ResearchVM will be more efficientstill.</li>
+<li><strong>Finer-grained information</strong>.The granularity of a card table can be chosen according to an accuracy/space overhead tradeoff. The “cardsize” in a virtual memory protection scheme is the page size, which ischosen to optimize properties, such as efficiency of disk transfer, thatare completely unconnected with the concerns of garbage collection.Generally, these concerns lead to pages that are larger than optimalfor reference update tracking, typically at least 4 Kbytes. In contrast,the card size of ResearchVM is 512 bytes.3</li>
+<li><strong>More accurate type information</strong>.The ResearchVM dirties a cardonly when a field of a reference type on that card is updated.  Avirtual-memory-based system cannot distinguish between updates of scalar and reference fields, and thus may dirty more pages than are necessary to track modified pointers. Furthe rmore, their approach was conservative else where, as well: it assumed all words were potential pointers.</li>
+</ul>
+<p>Hosking, Moss, and Stefanovic [17] present a detailed discussion of the trade-offs between software and page-protection-based barrier implementations.Their basic conclusion is that software mechanisms are more efficient thanthose using virtual memory protection.</p>
+<p>​    In fairness, we should note that the system of Boehmet al.was attempting to satisfy a further constraint not present in our system: accomplishing garbage collection for uncooperative languages (C and C++) without compiler support. This constraint led to the conservative collection scheme [7]on which the mostly-concurrent extension is based, and also favored theuse of the virtual-memory technique for reference update tracking, since this technique required no modification of the mutator code.  We should also note that their system was also generational, albeit in a rather different manner than ours, as described in [9]. This generational mark-sweep system gets some of the benefits of “traditional” generational systems with physically segregated generations. However, we believe that the latter aremore straightforward and probably more efficient. In particular, the copyingyoung generation used in the default configuration of our system providessignificantly more efficient allocation [3].</p>
+<p><img src="http://qd2x6jysb.bkt.clouddn.com/image-20200804033617346.png" alt="image-20200804033617346"></p>
+<p>​    Adapting the card table for the needs of the generational mostly-concurrent algorithm was straight forward. In fact, as discussed above, the write barrier and card table data structure were left unchanged. However, we took careful note of the fact that the card table is used in subtly different ways by two garbage collection algorithms that may be running simultaneously. The mostly-concurrent algorithm requires tracking of all references updated sincethe beginning of the current marking phase. Young-generation collection requires identification of all old-to-young pointers. In the base generational system, a young-generation collection scans all dirty old-space cards, search-ing for pointers into the young generation. If none are found, there is noneed to scan this card in the next collection, so the card is marked asclean.Before a young-generation collection cleans a dirty card, the information that the card has been modified must be recorded for the mostly-concurrent collector.</p>
+<p>​    This is accomplished by adding a new data structure, themod uniontable, shown in Figure 2, which is so-named because it represents the unionof the sets of cards modified between each of the young-generation collections that occur during concurrent marking. The card table itself contains a byte per card in the ResearchVM; this allows a fast write-barrier implementation using a byte store. The mod-union table, on the other hand, is a bit vectorwith one bit per card. It therefore adds little space overhead beyond the card table, and also enables fast traversal to find modified cards when the table is sparsely populated. We maintain an invariant on the mod union and card tables: any card containing a reference modified since the beginning of the current concurrent marking phase either has its bit set in the mod union table, or is marked dirty in the card table, or both. This invariant is maintained by young-generation collections, which set the mod union bits for all cards dirty in the card table before scanning those dirty cards.</p>
+<p>重要译文：</p>
+<p>使用卡表的好处：</p>
+<ul>
+<li>更少的开销。在大多数操作系统中，调用用于内存保护陷阱的自定义处理程序的成本非常高。 Hosk-ing和Moss [18]发现五指令卡片标记障碍要比基于页面保护的障碍更有效。 ResearchVM中使用的两或三指令实施仍将更加高效。</li>
+<li>更细粒度的信息。可以根据精度/空间开销的折衷选择卡片表的粒度。虚拟内存保护方案中的“卡大小”是页面大小，选择页面大小是为了优化属性（例如磁盘传输效率），而这些属性与垃圾回收问题完全无关。通常，这些问题导致页面的大小超出了优化的大小。参考更新跟踪，通常至少4 KB。相比之下，ResearchVM的卡大小为512字节。</li>
+<li>更准确的类型信息。仅当该卡上参考类型的字段被更新时，ResearchVM才会弄脏该卡。基于虚拟内存的系统无法区分标量和参考字段的更新，因此可能弄脏了比跟踪修改的指针所需的页面更多的页面。此外，他们的方法在其他方面也很保守：它假设所有单词都是潜在的指针。</li>
+</ul>
+<p>根据世代大部分并发算法的需要调整卡片表非常简单。实际上，如上所述，写屏障和卡表数据结构保持不变。但是，我们仔细地注意到了一个事实，即两种可能同时运行的垃圾收集算法以不同的方式使用了卡片表。多数并行算法需要跟踪自当前标记阶段开始以来更新的所有参考。年轻一代的收藏需要识别所有旧的指针。在基本世代系统中，年轻一代的集合会扫描所有脏的旧空间卡片，并搜索进入年轻一代的指针。如果未找到，则在下一个收集集中将无人扫描此卡，因此该卡被标记为“干净”。在年轻的收集清除脏卡之前，必须记录该卡已被修改的信息，主要用于-并发收集器。</p>
+<p>这可以通过添加一个新的数据结构mod mod uniontable来实现，如图2所示，之所以这样命名是因为它代表在并发标记期间发生的每个年轻代集合之间修改的卡片集的并集。卡表本身在ResearchVM中每个卡包含一个字节。这允许使用字节存储来快速实现写屏障。另一方面，组合表是位矢量，每张卡一位。因此，它在卡表之外增加了很少的空间开销，并且当表稀疏地填充时，还可以快速遍历以查找修改的卡。我们在mod union和card表上保持不变：自当前并发标记阶段开始以来，任何包含引用被修改的卡，要么在mod union表中设置了该位，要么在card table中被标记为脏，或二者兼有。该不变性由年轻的集合维护，这些集合在扫描脏卡之前为卡表中所有脏卡设置了mod union位。</p>
+</blockquote>
+<h2 id="问题-1"><a href="#问题-1" class="headerlink" title="问题"></a>问题</h2><h3 id="漏标如何处理？"><a href="#漏标如何处理？" class="headerlink" title="漏标如何处理？"></a>漏标如何处理？</h3><p><code>Incremental update</code>关注的是第一个条件的打破，即引用关系的插入。<code>Incremental update</code>利用<code>write barrier</code>将所有新插入的引用关系都记录下来，最后以这些引用关系的src为根<code>STW</code>地重新扫描一遍即避免了<strong>漏标问题</strong>。</p>
 <p>参考：</p>
 <p><a href="https://blog.codecentric.de/en/2013/10/useful-jvm-flags-part-7-cms-collector/" target="_blank" rel="noopener">Useful JVM Flags - Part 7(CMS Collector)</a></p>
 <p><a href="https://plumbr.io/handbook/garbage-collection-algorithms-implementations/concurrent-mark-and-sweep" target="_blank" rel="noopener">Concurrent mark and sweep</a></p>
@@ -331,7 +389,7 @@
   <div class="post-catalog" id="catalog">
     <div class="title">目录</div>
     <div class="catalog-content">
-      <ol class="toc"><li class="toc-item toc-level-2"><a class="toc-link" href="#使用场景"><span class="toc-text">使用场景</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#收集过程"><span class="toc-text">收集过程</span></a><ol class="toc-child"><li class="toc-item toc-level-3"><a class="toc-link" href="#初始标记（STW-InitialMarking）"><span class="toc-text">初始标记（STW, InitialMarking）</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#并发标记（Concurrent-Marking）"><span class="toc-text">并发标记（Concurrent Marking）</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#并发预处理（PreCleaning-amp-AbortablePreclean）"><span class="toc-text">并发预处理（PreCleaning &amp; AbortablePreclean）</span></a><ol class="toc-child"><li class="toc-item toc-level-4"><a class="toc-link" href="#还有个AbortablePreclean（可中断预清理）："><span class="toc-text">还有个AbortablePreclean（可中断预清理）：</span></a></li><li class="toc-item toc-level-4"><a class="toc-link" href="#为什么需要这个阶段，存在的价值是什么？"><span class="toc-text">为什么需要这个阶段，存在的价值是什么？</span></a></li></ol></li><li class="toc-item toc-level-3"><a class="toc-link" href="#重新标记（STW-Final-Remark）"><span class="toc-text">重新标记（STW, Final Remark）</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#并发清理（Concurrent-Preclean）"><span class="toc-text">并发清理（Concurrent Preclean）</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#并发重置（CMS-concurrent-reset）"><span class="toc-text">并发重置（CMS-concurrent-reset）</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#问题"><span class="toc-text">问题</span></a><ol class="toc-child"><li class="toc-item toc-level-4"><a class="toc-link" href="#如果在重新标记之前刚好发生了一次MinorGC，会不会导致重新标记阶段Stop-the-World时间太长？"><span class="toc-text">如果在重新标记之前刚好发生了一次MinorGC，会不会导致重新标记阶段Stop the World时间太长？</span></a></li></ol></li></ol></li><li class="toc-item toc-level-2"><a class="toc-link" href="#指令参数"><span class="toc-text">指令参数</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#优点"><span class="toc-text">优点</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#缺点"><span class="toc-text">缺点</span></a></li></ol>
+      <ol class="toc"><li class="toc-item toc-level-2"><a class="toc-link" href="#使用场景"><span class="toc-text">使用场景</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#收集过程"><span class="toc-text">收集过程</span></a><ol class="toc-child"><li class="toc-item toc-level-3"><a class="toc-link" href="#初始标记（STW-InitialMarking）"><span class="toc-text">初始标记（STW, InitialMarking）</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#并发标记（Concurrent-Marking）"><span class="toc-text">并发标记（Concurrent Marking）</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#并发预处理（PreCleaning-amp-AbortablePreclean）"><span class="toc-text">并发预处理（PreCleaning &amp; AbortablePreclean）</span></a><ol class="toc-child"><li class="toc-item toc-level-4"><a class="toc-link" href="#还有个AbortablePreclean（可中断预清理）："><span class="toc-text">还有个AbortablePreclean（可中断预清理）：</span></a></li><li class="toc-item toc-level-4"><a class="toc-link" href="#为什么需要这个阶段，存在的价值是什么？"><span class="toc-text">为什么需要这个阶段，存在的价值是什么？</span></a></li></ol></li><li class="toc-item toc-level-3"><a class="toc-link" href="#重新标记（STW-Final-Remark）"><span class="toc-text">重新标记（STW, Final Remark）</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#并发清理（Concurrent-Preclean）"><span class="toc-text">并发清理（Concurrent Preclean）</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#并发重置（CMS-concurrent-reset）"><span class="toc-text">并发重置（CMS-concurrent-reset）</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#问题"><span class="toc-text">问题</span></a><ol class="toc-child"><li class="toc-item toc-level-4"><a class="toc-link" href="#如果在重新标记之前刚好发生了一次MinorGC，会不会导致重新标记阶段Stop-the-World时间太长？"><span class="toc-text">如果在重新标记之前刚好发生了一次MinorGC，会不会导致重新标记阶段Stop the World时间太长？</span></a></li></ol></li></ol></li><li class="toc-item toc-level-2"><a class="toc-link" href="#指令参数"><span class="toc-text">指令参数</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#优点"><span class="toc-text">优点</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#缺点"><span class="toc-text">缺点</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#问题-1"><span class="toc-text">问题</span></a><ol class="toc-child"><li class="toc-item toc-level-3"><a class="toc-link" href="#漏标如何处理？"><span class="toc-text">漏标如何处理？</span></a></li></ol></li></ol>
     </div>
   </div>
 

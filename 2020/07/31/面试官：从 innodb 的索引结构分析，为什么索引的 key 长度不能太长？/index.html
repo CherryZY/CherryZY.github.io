@@ -1,0 +1,507 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+  <head>
+  <meta charset="utf-8">
+  <meta name="author" content="zchengsite, 1451426471@qq.com" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  
+  
+  <title>从 innodb 的索引结构分析，为什么索引的 key 长度不能太长？ | coder的特殊身份</title>
+
+  
+    <link rel="apple-touch-icon" href="/images/favicon.png">
+    <link rel="icon" href="/images/favicon.png">
+  
+
+  <!-- Raleway-Font -->
+  <link href="https://fonts.googleapis.com/css?family=Raleway&display=swap" rel="stylesheet">
+
+  <!-- hexo site css -->
+  
+<link rel="stylesheet" href="/css/base.css">
+<link rel="stylesheet" href="/iconfont/iconfont.css">
+<link rel="stylesheet" href="/css/github-markdown.css">
+<link rel="stylesheet" href="/css/highlight.css">
+
+
+  <!-- jquery3.3.1 -->
+  <script src="https://cdn.bootcss.com/jquery/3.3.1/jquery.min.js"></script>
+
+  <!-- fancybox -->
+  <link href="https://cdn.bootcss.com/fancybox/3.5.2/jquery.fancybox.min.css" rel="stylesheet">
+  <script async src="https://cdn.bootcss.com/fancybox/3.5.2/jquery.fancybox.min.js"></script>
+  
+<script src="/js/fancybox.js"></script>
+
+
+  
+
+<meta name="generator" content="Hexo 4.2.1"></head>
+
+
+  <body>
+    <div id="app">
+      <div class="header">
+  <div class="avatar">
+    <a href="/"><img src="/images/avatar.png" alt=""></a>
+    <div class="nickname"><a href="/"></a></div>
+  </div>
+  <div class="navbar">
+    <ul>
+      
+        <li class="nav-item" data-path="/">
+          <a href="/">主页</a>
+        </li>
+      
+        <li class="nav-item" data-path="/archives/">
+          <a href="/archives/">归档</a>
+        </li>
+      
+        <li class="nav-item" data-path="/categories/">
+          <a href="/categories/">分类</a>
+        </li>
+      
+        <li class="nav-item" data-path="/tags/">
+          <a href="/tags/">标签</a>
+        </li>
+      
+        <li class="nav-item" data-path="/about/">
+          <a href="/about/">关于</a>
+        </li>
+      
+    </ul>
+  </div>
+</div>
+
+
+<script src="/js/activeNav.js"></script>
+
+
+
+      <div class="flex-container">
+        <!-- 文章详情页，展示文章具体内容，url形式：https://yoursite/文章标题/ -->
+<!-- 同时为「标签tag」，「朋友friend」，「分类categories」，「关于about」页面的承载页面，具体展示取决于page.type -->
+
+
+  
+  
+  
+  
+  
+  
+  
+  
+  <!-- 文章内容页 url形式：https://yoursite/文章标题/ -->
+  <div class="container post-details" id="post-details">
+    <div class="post-content">
+      <div class="post-title">从 innodb 的索引结构分析，为什么索引的 key 长度不能太长？</div>
+      <div class="post-attach">
+        <span class="post-pubtime">2020-07-31</span>
+        
+              <span class="post-tags">
+                <i class="iconfont icon-tags" title="标签 | tags"></i>
+                
+                <span class="span--tag">
+                  <a href="/tags/MySql/" title="查看 MySql 标签">
+                    <b>#</b> MySql
+                  </a>
+                </span>
+                
+                <span class="span--tag">
+                  <a href="/tags/InnoDB/" title="查看 InnoDB 标签">
+                    <b>#</b> InnoDB
+                  </a>
+                </span>
+                
+                <span class="span--tag">
+                  <a href="/tags/%E7%B4%A2%E5%BC%95/" title="查看 索引 标签">
+                    <b>#</b> 索引
+                  </a>
+                </span>
+                
+              </span>
+          
+      </div>
+      <div class="markdown-body">
+        <h2 id="首先看什么是索引？"><a href="#首先看什么是索引？" class="headerlink" title="首先看什么是索引？"></a>首先看什么是索引？</h2><p><strong>索引</strong>是一种快速查询表中内容的机制，运用在表中某些字段上，存储时，独立于表之外。</p>
+<h3 id="优点"><a href="#优点" class="headerlink" title="优点"></a>优点</h3><ul>
+<li>大大减少了服务器需要扫描的数据量；</li>
+<li>可以帮助服务器避免排序和临时表；</li>
+<li>将随机<code>I/O</code>变为顺序<code>I/O</code>；</li>
+</ul>
+<h2 id="在MySql中的索引为什么是B-树结构？"><a href="#在MySql中的索引为什么是B-树结构？" class="headerlink" title="在MySql中的索引为什么是B+树结构？"></a>在MySql中的索引为什么是B+树结构？</h2><p>emm…  先看看其他结构：</p>
+<h3 id="Hash"><a href="#Hash" class="headerlink" title="Hash"></a>Hash</h3><p>对每行数据，存储引擎都会对所有的索引列计算一个<code>Hash Code</code>（哈希码）。</p>
+<p>基于<code>Hash</code>表的实现，只有精确匹配索引所有列查询才有效。</p>
+<h4 id="特点"><a href="#特点" class="headerlink" title="特点"></a>特点</h4><ul>
+<li>只有精确匹配索引所有列的查询才有效；</li>
+<li>访问速度快（除非有很多<code>Hash</code>冲突）；</li>
+<li><code>Hash</code>冲突多的话，维护代价会很高；</li>
+</ul>
+<h4 id="缺点"><a href="#缺点" class="headerlink" title="缺点"></a>缺点</h4><ul>
+<li>只包含<code>Hash</code>值和行指针，<strong>不能用索引中的值来避免读取行</strong>；</li>
+<li><strong>并不是按照索引值来顺序存储</strong>（无法用于排序）；</li>
+<li><strong>不支持部分索引列匹配查找</strong>（使用索引列的全部内容计算<code>Hash</code>值）；</li>
+<li>只适用于<strong>等值比较查询</strong>；</li>
+</ul>
+<h4 id="时间复杂度"><a href="#时间复杂度" class="headerlink" title="时间复杂度"></a>时间复杂度</h4><ul>
+<li>当等值查询，<code>O(1)</code>；</li>
+<li>当范围查询或者其他查询，<code>O(n)</code>；</li>
+</ul>
+<h4 id="空间复杂度"><a href="#空间复杂度" class="headerlink" title="空间复杂度"></a>空间复杂度</h4><p>为一长段内存存储块<code>O(n)</code>。</p>
+<p>这个不画图了哈，很常见的存储结构（数组）。</p>
+<h3 id="二叉查找树"><a href="#二叉查找树" class="headerlink" title="二叉查找树"></a>二叉查找树</h3><p>左子树的键值小于根的键值，右子树的键值大于根的键值。</p>
+<p><img src="http://qd2x6jysb.bkt.clouddn.com/image-20200731141842208.png" alt="image-20200731141842208"></p>
+<h4 id="特点-1"><a href="#特点-1" class="headerlink" title="特点"></a>特点</h4><ul>
+<li><code>left &lt; root &lt; right</code>；</li>
+<li>标准二叉树；</li>
+</ul>
+<h4 id="缺点-1"><a href="#缺点-1" class="headerlink" title="缺点"></a>缺点</h4><ul>
+<li>某种情况下会线性；不平衡</li>
+</ul>
+<p><img src="http://qd2x6jysb.bkt.clouddn.com/image-20200731142004907.png" alt="image-20200731142004907"></p>
+<h4 id="时间复杂度-1"><a href="#时间复杂度-1" class="headerlink" title="时间复杂度"></a>时间复杂度</h4><p>规整二叉树的话，<code>O(log(n))</code>；</p>
+<p>极端情况下，<code>O(n)</code></p>
+<h3 id="平衡二叉树（AVL）"><a href="#平衡二叉树（AVL）" class="headerlink" title="平衡二叉树（AVL）"></a>平衡二叉树（AVL）</h3><p>平衡二叉树（AVL树）在符合二叉查找树的条件下，还满足任何节点的两个子树的高度最大差为1。</p>
+<p><img src="http://qd2x6jysb.bkt.clouddn.com/image-20200731142142051.png" alt="image-20200731142142051"></p>
+<h4 id="特点-2"><a href="#特点-2" class="headerlink" title="特点"></a>特点</h4><ul>
+<li>为了保证平衡（最短子树与最长子树差不超过1），会移动节点。</li>
+<li>满足二叉查找树。</li>
+</ul>
+<h4 id="缺点-2"><a href="#缺点-2" class="headerlink" title="缺点"></a>缺点</h4><ul>
+<li><p>插入/删除节点，会导致失衡，需要进一步进行节点调整等操作。</p>
+<p>这种失去平衡的二叉树可以概括为四种姿态：LL（左左）、RR（右右）、LR（左右）、RL（右左）：</p>
+<p><img src="http://qd2x6jysb.bkt.clouddn.com/image-20200731142628225.png" alt="image-20200731142628225"></p>
+</li>
+</ul>
+<p>来，一个一个分析，一个一个<strong>旋转</strong>：</p>
+<h5 id="LL"><a href="#LL" class="headerlink" title="LL"></a>LL</h5><p>插入或删除一个节点后，根节点的左孩子（Left Child）的左孩子（Left Child）还有非空节点，导致根节点的左子树高度比右子树高度高2，AVL树失去平衡。</p>
+<p>旋转：</p>
+<ol>
+<li>将根节点的左孩子作为新根节点。</li>
+<li>将新根节点的右孩子作为原根节点的左孩子。</li>
+<li>将原根节点作为新根节点的右孩子。</li>
+</ol>
+<p><img src="http://qd2x6jysb.bkt.clouddn.com/image-20200731142935616.png" alt="image-20200731142935616"></p>
+<h5 id="LR"><a href="#LR" class="headerlink" title="LR"></a>LR</h5><p>插入或删除一个节点后，根节点的左孩子（Left Child）的右孩子（Right Child）还有非空节点，导致根节点的左子树高度比右子树高度高2，AVL树失去平衡。</p>
+<p>旋转：</p>
+<ol>
+<li>围绕根节点的左孩子进行RR旋转。</li>
+<li>围绕根节点进行LL旋转。</li>
+</ol>
+<p><img src="http://qd2x6jysb.bkt.clouddn.com/image-20200731143052608.png" alt="image-20200731143052608"></p>
+<h5 id="RL"><a href="#RL" class="headerlink" title="RL"></a>RL</h5><p>插入或删除一个节点后，根节点的右孩子（Right Child）的左孩子（Left Child）还有非空节点，导致根节点的右子树高度比左子树高度高2，AVL树失去平衡。</p>
+<p>旋转：</p>
+<ol>
+<li>围绕根节点的右孩子进行LL旋转。</li>
+<li>围绕根节点进行RR旋转。</li>
+</ol>
+<p><img src="http://qd2x6jysb.bkt.clouddn.com/image-20200731143119445.png" alt="image-20200731143119445"></p>
+<h5 id="RR"><a href="#RR" class="headerlink" title="RR"></a>RR</h5><p>插入或删除一个节点后，根节点的右孩子（Right Child）的右孩子（Right Child）还有非空节点，导致根节点的右子树高度比左子树高度高2，AVL树失去平衡。</p>
+<p>旋转：</p>
+<ol>
+<li>将根节点的右孩子作为新根节点。</li>
+<li>将新根节点的左孩子作为原根节点的右孩子。</li>
+<li>将原根节点作为新根节点的左孩子。</li>
+</ol>
+<p><img src="http://qd2x6jysb.bkt.clouddn.com/image-20200731143022677.png" alt="image-20200731143022677"></p>
+<h4 id="时间复杂度-2"><a href="#时间复杂度-2" class="headerlink" title="时间复杂度"></a>时间复杂度</h4><p>最坏情况下为<code>O log(n)</code>。</p>
+<h3 id="红黑树（Red-Black-Tree）"><a href="#红黑树（Red-Black-Tree）" class="headerlink" title="红黑树（Red-Black Tree）"></a>红黑树（Red-Black Tree）</h3><blockquote>
+<p>参考：</p>
+<p><a href="https://www.jianshu.com/p/e136ec79235c" target="_blank" rel="noopener">30张图带你彻底理解红黑树</a></p>
+<p><a href="https://zhuanlan.zhihu.com/p/79980618?utm_source=cn.wiz.note" target="_blank" rel="noopener">红黑树</a></p>
+<p><a href="https://www.jianshu.com/p/236cbd451874" target="_blank" rel="noopener">数据结构与算法（十四）深入理解红黑树和JDK TreeMap和TreeSet源码分析</a></p>
+</blockquote>
+<p>它近似二叉平衡树。</p>
+<p>比起<code>AVL</code>，红黑树在插入、删除等操作，<strong>不会像平衡树那样，频繁着破坏红黑树的规则，所以不需要频繁着调整</strong>。</p>
+<p><img src="http://qd2x6jysb.bkt.clouddn.com/image-20200804004125103.png" alt="image-20200804004125103"></p>
+<blockquote>
+<p>Java TreeMap实现了SortedMap接口，也就是说会按照key的大小顺序对Map中的元素进行排序，key大小的评判可以通过其本身的自然顺序（natural ordering），也可以通过构造时传入的比较器（Comparator）。TreeMap底层通过红黑树（Red-Black tree）实现，也就意味着containsKey(), get(), put(), remove()都有着log(n)的时间复杂度。</p>
+</blockquote>
+<h4 id="特点-3"><a href="#特点-3" class="headerlink" title="特点"></a>特点</h4><ul>
+<li>最长路径不超过最短路径的2倍</li>
+<li>每个节点要么是黑色，要么是红色。</li>
+<li>根节点是黑色。</li>
+<li>每个叶子节点（NIL）是黑色。</li>
+<li>每个红色结点的两个子结点一定都是黑色。</li>
+<li><strong>任意一结点到每个叶子结点的路径都包含数量相同的黑结点。</strong></li>
+</ul>
+<h4 id="缺点-3"><a href="#缺点-3" class="headerlink" title="缺点"></a>缺点</h4><p>这里其实和平衡二叉树同理。</p>
+<h4 id="时间复杂度-3"><a href="#时间复杂度-3" class="headerlink" title="时间复杂度"></a>时间复杂度</h4><p><code>O(logn)</code></p>
+<p>剩下的比如<strong>旋转，变色</strong>什么的我就不提了，自己看。</p>
+<h4 id="相关面试问题"><a href="#相关面试问题" class="headerlink" title="相关面试问题"></a>相关面试问题</h4><h5 id="jdk-1-8-HashMap-中有使用到红黑树，你知道触发条件是什么吗？有读过源码是如何-put-和-remove-的吗？"><a href="#jdk-1-8-HashMap-中有使用到红黑树，你知道触发条件是什么吗？有读过源码是如何-put-和-remove-的吗？" class="headerlink" title="jdk 1.8 HashMap 中有使用到红黑树，你知道触发条件是什么吗？有读过源码是如何 put 和 remove 的吗？"></a>jdk 1.8 HashMap 中有使用到红黑树，你知道触发条件是什么吗？有读过源码是如何 put 和 remove 的吗？</h5><p><code>put()</code>：</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">public</span> V <span class="title">put</span><span class="params">(K key, V value)</span> </span>&#123;</span><br><span class="line">    <span class="keyword">return</span> putVal(hash(key), key, value, <span class="keyword">false</span>, <span class="keyword">true</span>);</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="function"><span class="keyword">final</span> V <span class="title">putVal</span><span class="params">(<span class="keyword">int</span> hash, K key, V value, <span class="keyword">boolean</span> onlyIfAbsent,</span></span></span><br><span class="line"><span class="function"><span class="params">               <span class="keyword">boolean</span> evict)</span> </span>&#123;</span><br><span class="line">    Node&lt;K,V&gt;[] tab; Node&lt;K,V&gt; p; <span class="keyword">int</span> n, i;</span><br><span class="line">    <span class="keyword">if</span> ((tab = table) == <span class="keyword">null</span> || (n = tab.length) == <span class="number">0</span>)</span><br><span class="line">        n = (tab = resize()).length;</span><br><span class="line">    <span class="keyword">if</span> ((p = tab[i = (n - <span class="number">1</span>) &amp; hash]) == <span class="keyword">null</span>)</span><br><span class="line">        tab[i] = newNode(hash, key, value, <span class="keyword">null</span>);</span><br><span class="line">    <span class="keyword">else</span> &#123;</span><br><span class="line">        Node&lt;K,V&gt; e; K k;</span><br><span class="line">        <span class="keyword">if</span> (p.hash == hash &amp;&amp;</span><br><span class="line">            ((k = p.key) == key || (key != <span class="keyword">null</span> &amp;&amp; key.equals(k))))</span><br><span class="line">            e = p;</span><br><span class="line">        <span class="keyword">else</span> <span class="keyword">if</span> (p <span class="keyword">instanceof</span> TreeNode)</span><br><span class="line">            e = ((TreeNode&lt;K,V&gt;)p).putTreeVal(<span class="keyword">this</span>, tab, hash, key, value);</span><br><span class="line">        <span class="keyword">else</span> &#123;</span><br><span class="line">            <span class="keyword">for</span> (<span class="keyword">int</span> binCount = <span class="number">0</span>; ; ++binCount) &#123;</span><br><span class="line">                <span class="keyword">if</span> ((e = p.next) == <span class="keyword">null</span>) &#123;</span><br><span class="line">                    p.next = newNode(hash, key, value, <span class="keyword">null</span>);</span><br><span class="line">                    <span class="keyword">if</span> (binCount &gt;= TREEIFY_THRESHOLD - <span class="number">1</span>) <span class="comment">// -1 for 1st</span></span><br><span class="line">                        treeifyBin(tab, hash);</span><br><span class="line">                    <span class="keyword">break</span>;</span><br><span class="line">                &#125;</span><br><span class="line">                <span class="keyword">if</span> (e.hash == hash &amp;&amp;</span><br><span class="line">                    ((k = e.key) == key || (key != <span class="keyword">null</span> &amp;&amp; key.equals(k))))</span><br><span class="line">                    <span class="keyword">break</span>;</span><br><span class="line">                p = e;</span><br><span class="line">            &#125;</span><br><span class="line">        &#125;</span><br><span class="line">        <span class="keyword">if</span> (e != <span class="keyword">null</span>) &#123; <span class="comment">// existing mapping for key</span></span><br><span class="line">            V oldValue = e.value;</span><br><span class="line">            <span class="keyword">if</span> (!onlyIfAbsent || oldValue == <span class="keyword">null</span>)</span><br><span class="line">                e.value = value;</span><br><span class="line">            afterNodeAccess(e);</span><br><span class="line">            <span class="keyword">return</span> oldValue;</span><br><span class="line">        &#125;</span><br><span class="line">    &#125;</span><br><span class="line">    ++modCount;</span><br><span class="line">    <span class="keyword">if</span> (++size &gt; threshold)</span><br><span class="line">        resize();</span><br><span class="line">    afterNodeInsertion(evict);</span><br><span class="line">    <span class="keyword">return</span> <span class="keyword">null</span>;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p><code>get()</code>：</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br></pre></td><td class="code"><pre><span class="line"></span><br><span class="line">  <span class="function"><span class="keyword">public</span> V <span class="title">get</span><span class="params">(Object key)</span> </span>&#123;</span><br><span class="line">      Node&lt;K,V&gt; e;</span><br><span class="line">      <span class="keyword">return</span> (e = getNode(hash(key), key)) == <span class="keyword">null</span> ? <span class="keyword">null</span> : e.value;</span><br><span class="line">  &#125;</span><br><span class="line">	</span><br><span class="line"><span class="function"><span class="keyword">final</span> Node&lt;K,V&gt; <span class="title">getNode</span><span class="params">(<span class="keyword">int</span> hash, Object key)</span> </span>&#123;</span><br><span class="line">      Node&lt;K,V&gt;[] tab; Node&lt;K,V&gt; first, e; <span class="keyword">int</span> n; K k;</span><br><span class="line">      <span class="keyword">if</span> ((tab = table) != <span class="keyword">null</span> &amp;&amp; (n = tab.length) &gt; <span class="number">0</span> &amp;&amp;</span><br><span class="line">          (first = tab[(n - <span class="number">1</span>) &amp; hash]) != <span class="keyword">null</span>) &#123;</span><br><span class="line">          <span class="keyword">if</span> (first.hash == hash &amp;&amp; <span class="comment">// always check first node</span></span><br><span class="line">              ((k = first.key) == key || (key != <span class="keyword">null</span> &amp;&amp; key.equals(k))))</span><br><span class="line">              <span class="keyword">return</span> first;</span><br><span class="line">          <span class="keyword">if</span> ((e = first.next) != <span class="keyword">null</span>) &#123;</span><br><span class="line">              <span class="keyword">if</span> (first <span class="keyword">instanceof</span> TreeNode)</span><br><span class="line">                  <span class="keyword">return</span> ((TreeNode&lt;K,V&gt;)first).getTreeNode(hash, key);</span><br><span class="line">              <span class="keyword">do</span> &#123;</span><br><span class="line">                  <span class="keyword">if</span> (e.hash == hash &amp;&amp;</span><br><span class="line">                      ((k = e.key) == key || (key != <span class="keyword">null</span> &amp;&amp; key.equals(k))))</span><br><span class="line">                      <span class="keyword">return</span> e;</span><br><span class="line">              &#125; <span class="keyword">while</span> ((e = e.next) != <span class="keyword">null</span>);</span><br><span class="line">          &#125;</span><br><span class="line">      &#125;</span><br><span class="line">      <span class="keyword">return</span> <span class="keyword">null</span>;</span><br><span class="line">  &#125;</span><br></pre></td></tr></table></figure>
+
+
+
+<h5 id="java中TreeMap内对红黑树如何操作的？比如插入节点后、删除节点后？"><a href="#java中TreeMap内对红黑树如何操作的？比如插入节点后、删除节点后？" class="headerlink" title="java中TreeMap内对红黑树如何操作的？比如插入节点后、删除节点后？"></a>java中TreeMap内对红黑树如何操作的？比如插入节点后、删除节点后？</h5><blockquote>
+<p>TreeMap底层就是用红黑树实现的，它在插入后调整操作主要在<strong>fixAfterInsertion</strong>方法；</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">private</span> <span class="keyword">void</span> <span class="title">fixAfterInsertion</span><span class="params">(Entry&lt;K,V&gt; x)</span> </span>&#123;</span><br><span class="line">    x.color = RED;</span><br><span class="line"></span><br><span class="line">    <span class="keyword">while</span> (x != <span class="keyword">null</span> &amp;&amp; x != root &amp;&amp; x.parent.color == RED) &#123;</span><br><span class="line">        <span class="keyword">if</span> (parentOf(x) == leftOf(parentOf(parentOf(x)))) &#123;</span><br><span class="line">            Entry&lt;K,V&gt; y = rightOf(parentOf(parentOf(x)));</span><br><span class="line">            <span class="comment">//-----Case3情况----- 删除的结点是黑色，如果当前处理的结点是红色结点，将该结点设置为黑色</span></span><br><span class="line">            <span class="keyword">if</span> (colorOf(y) == RED) &#123;</span><br><span class="line">                setColor(parentOf(x), BLACK);</span><br><span class="line">                setColor(y, BLACK);</span><br><span class="line">                setColor(parentOf(parentOf(x)), RED);</span><br><span class="line">                x = parentOf(parentOf(x));</span><br><span class="line">            &#125; <span class="keyword">else</span> &#123;</span><br><span class="line">                <span class="comment">//-----Case4情况----- 兄弟结点为红色</span></span><br><span class="line">                <span class="keyword">if</span> (x == rightOf(parentOf(x))) &#123;</span><br><span class="line">                    x = parentOf(x);</span><br><span class="line">                    rotateLeft(x);</span><br><span class="line">                &#125;</span><br><span class="line">                <span class="comment">//-----Case5情况----- 兄弟结点为黑色，左侄子LN为黑色，右侄子RN为黑色</span></span><br><span class="line">                setColor(parentOf(x), BLACK);</span><br><span class="line">                setColor(parentOf(parentOf(x)), RED);</span><br><span class="line">                rotateRight(parentOf(parentOf(x)));</span><br><span class="line">            &#125;</span><br><span class="line">        &#125; <span class="keyword">else</span> &#123;</span><br><span class="line">            <span class="comment">//省略镜像情况</span></span><br><span class="line">        &#125;</span><br><span class="line">    &#125;</span><br><span class="line">    root.color = BLACK;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>删除后调整操作主要在<strong>fixAfterDeletion</strong>方法；</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">private</span> <span class="keyword">void</span> <span class="title">fixAfterDeletion</span><span class="params">(Entry&lt;K,V&gt; x)</span> </span>&#123;</span><br><span class="line">    <span class="keyword">while</span> (x != root &amp;&amp; colorOf(x) == BLACK) &#123;</span><br><span class="line">        <span class="keyword">if</span> (x == leftOf(parentOf(x))) &#123;</span><br><span class="line">            Entry&lt;K,V&gt; sib = rightOf(parentOf(x));</span><br><span class="line">            <span class="comment">//-----Case4的情况----- 兄弟结点为红色</span></span><br><span class="line">            <span class="keyword">if</span> (colorOf(sib) == RED) &#123;</span><br><span class="line">                setColor(sib, BLACK);</span><br><span class="line">                setColor(parentOf(x), RED);</span><br><span class="line">                rotateLeft(parentOf(x));</span><br><span class="line">                sib = rightOf(parentOf(x));</span><br><span class="line">            &#125;</span><br><span class="line">            <span class="comment">//-----Case5的情况----- 兄弟结点为黑色，左侄子LN为黑色，右侄子RN为黑色</span></span><br><span class="line">            <span class="keyword">if</span> (colorOf(leftOf(sib))  == BLACK &amp;&amp;</span><br><span class="line">                colorOf(rightOf(sib)) == BLACK) &#123;</span><br><span class="line">                setColor(sib, RED);</span><br><span class="line">                x = parentOf(x);</span><br><span class="line">            &#125; <span class="keyword">else</span> &#123;</span><br><span class="line">                <span class="comment">//-----Case6的情况----- 兄弟结点为黑色，左侄子为红色，右侄子RN为黑色</span></span><br><span class="line">                <span class="keyword">if</span> (colorOf(rightOf(sib)) == BLACK) &#123;</span><br><span class="line">                    setColor(leftOf(sib), BLACK);</span><br><span class="line">                    setColor(sib, RED);</span><br><span class="line">                    rotateRight(sib);</span><br><span class="line">                    sib = rightOf(parentOf(x));</span><br><span class="line">                &#125;</span><br><span class="line">                <span class="comment">//-----Case7的情况----- 兄弟结点为黑色，左侄子不管红黑，右侄子为红色</span></span><br><span class="line">                setColor(sib, colorOf(parentOf(x)));</span><br><span class="line">                setColor(parentOf(x), BLACK);</span><br><span class="line">                setColor(rightOf(sib), BLACK);</span><br><span class="line">                rotateLeft(parentOf(x));</span><br><span class="line">                x = root;</span><br><span class="line">            &#125;</span><br><span class="line">        &#125; <span class="keyword">else</span> &#123; <span class="comment">// symmetric</span></span><br><span class="line">            <span class="comment">//省略镜像的情况</span></span><br><span class="line">        &#125;</span><br><span class="line">    &#125;</span><br><span class="line">    setColor(x, BLACK);</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+</blockquote>
+<h3 id="B-树（平衡多路查找树）"><a href="#B-树（平衡多路查找树）" class="headerlink" title="B-树（平衡多路查找树）"></a>B-树（平衡多路查找树）</h3><p>先看下相关的<strong>局部性原理</strong>：</p>
+<p>系统从磁盘读取数据到内存时是以磁盘块（block）为基本单位的，位于同一个磁盘块中的数据会被一次性读取出来。</p>
+<p>而<code>InnoDB</code>页大小默认为<code>16k</code>，但是系统一个磁盘块的存储空间往往没有这么大，因此<code>InnoDB</code>每次申请磁盘空间时都会是若干地址连续磁盘块来达到页的大小<code>16KB</code>。</p>
+<p><code>InnoDB</code>存储引擎中有页（<code>Page</code>）的概念，页是其磁盘管理的最小单位。</p>
+<p><code>InnoDB</code>存储引擎中默认每个页的大小为<code>16KB</code>，可通过参数<code>innodb_page_size</code>将页的大小设置为<code>4K</code>、<code>8K</code>、<code>16K</code>。</p>
+<figure class="highlight sql"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># 查看页大小</span></span><br><span class="line"><span class="keyword">show</span> <span class="keyword">variables</span> <span class="keyword">like</span> <span class="string">'innodb_page_size'</span>;</span><br></pre></td></tr></table></figure>
+
+
+
+<h4 id="特点-4"><a href="#特点-4" class="headerlink" title="特点"></a>特点</h4><p><code>m</code>为树高度；</p>
+<p><code>ceil</code>函数返回<strong>大于或者等于指定表达式的最小整数</strong>。</p>
+<ul>
+<li><p>不再是二叉搜索，而是<code>m</code>叉搜索；</p>
+</li>
+<li><p>叶子节点，非叶子节点，都存储数据；</p>
+</li>
+<li><p>中序遍历，可以获得所有节点；</p>
+</li>
+<li><p>非根节点包含的关键字个数 <code>j</code> 满足，<code>ceil(m/2)-1 &lt;= n &lt;= m-1</code>，<strong>节点分裂</strong>时要满足这个条件。</p>
+</li>
+<li><p>每个节点最多有<code>m</code>个孩子。 </p>
+</li>
+<li><p>除了根节点和叶子节点外，其它每个节点至少有<code>Ceil(m/2)</code>个孩子；</p>
+</li>
+<li><p>若根节点不是叶子节点，则至少有2个孩子 ；</p>
+</li>
+</ul>
+<p><img src="http://qd2x6jysb.bkt.clouddn.com/image-20200731143515516.png" alt="image-20200731143515516"></p>
+<p>按上图模拟查找关键字29的过程：</p>
+<ol>
+<li>根据根节点找到磁盘块1，读入内存。【磁盘I/O操作第1次】</li>
+<li>比较关键字29在区间（17,35），找到磁盘块1的指针P2。</li>
+<li>根据P2指针找到磁盘块3，读入内存。【磁盘I/O操作第2次】</li>
+<li>比较关键字29在区间（26,30），找到磁盘块3的指针P2。</li>
+<li>根据P2指针找到磁盘块8，读入内存。【磁盘I/O操作第3次】</li>
+<li>在磁盘块8中的关键字列表中找到关键字29。</li>
+</ol>
+<p>如上需要3次磁盘<code>I/O</code>操作，和3次内存查找操作。</p>
+<p>由于内存中的关键字是一个有序表结构，可以利用二分法查找提高效率。而3次磁盘<code>I/O</code>操作是影响整个<code>B-Tree</code>查找效率的决定因素。</p>
+<p><code>B-Tree</code>相对于<code>AVLTree</code>缩减了节点个数，使每次磁盘I/O取到内存的数据都发挥了作用，从而提高了查询效率。</p>
+<h4 id="缺点-4"><a href="#缺点-4" class="headerlink" title="缺点"></a>缺点</h4><ul>
+<li>非页节点存储数据，数据过大会导致指针数变小，影响存储数据量；</li>
+<li>存储节点过少；</li>
+<li>范围查询较慢；</li>
+</ul>
+<h3 id="B-树"><a href="#B-树" class="headerlink" title="B+树"></a>B+树</h3><p><code>B+Tree</code>相对于<code>B-Tree</code>有几点不同：</p>
+<ol>
+<li>非叶子节点只存储键值信息。</li>
+<li>所有叶子节点之间都有一个链指针（双向链表）。</li>
+<li>数据记录都存放在叶子节点中。</li>
+</ol>
+<p><img src="http://qd2x6jysb.bkt.clouddn.com/image-20200731144239056.png" alt="image-20200731144239056"></p>
+<h4 id="特点-5"><a href="#特点-5" class="headerlink" title="特点"></a>特点</h4><ul>
+<li><p>范围查找，定位<code>min</code>与<code>max</code>之后，中间叶子节点，就是结果集，不用中序回溯；</p>
+</li>
+<li><p>叶子节点存储实际记录行，记录行相对比较紧密的存储，适合大数据量磁盘存储；</p>
+<p>非叶子节点存储记录的<code>PK（Primary Key）</code>，用于查询加速，适合内存存储；</p>
+</li>
+<li><p>非叶子节点，不存储实际记录，而只存储记录的<code>KEY</code>的话，那么在相同内存的情况下，<code>B+树</code>能够存储更多索引；</p>
+</li>
+<li><p>比起<code>B树</code>，减少<code>IO</code>访问次数；</p>
+</li>
+</ul>
+<p><code>B+Tree</code>索引可以分为聚集索引（<code>clustered index</code>）和辅助索引（secondary index）。上面的<code>B+Tree</code>示例图在数据库中的实现即为聚集索引，聚集索引的<code>B+Tree</code>中的叶子节点存放的是整张表的行记录数据。</p>
+<p>辅助索引与聚集索引的区别在于辅助索引的叶子节点并不包含行记录的全部数据，而是存储相应行数据的聚集索引键，即主键。当通过辅助索引来查询数据时，<code>InnoDB</code>存储引擎会遍历辅助索引找到主键，然后再通过主键在聚集索引中找到完整的行记录数据。</p>
+<h4 id="伪Hash索引"><a href="#伪Hash索引" class="headerlink" title="伪Hash索引"></a>伪Hash索引</h4><p>本质还是B+索引，只是将值进行Hash整数，方便等值查询；</p>
+<figure class="highlight sql"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">SELECT</span> <span class="keyword">id</span> <span class="keyword">FROM</span> <span class="keyword">url</span>=<span class="string">'www'</span> <span class="keyword">AND</span> url_crc = <span class="keyword">CRC32</span>(<span class="string">'www'</span>);</span><br></pre></td></tr></table></figure>
+
+
+
+<p>InnoDB存储引擎中页的大小为16KB，一般表的主键类型为INT（占用4个字节）或BIGINT（占用8个字节），指针类型也一般为4或8个字节，也就是说一个页（B+Tree中的一个节点）中大概存储16KB/(8B+8B)=1K个键值（因为是估值，为方便计算，这里的K取值为〖10〗^3）。也就是说一个深度为3的B+Tree索引可以维护10^3 * 10^3 * 10^3 = 10亿 条记录。</p>
+<h3 id="为什么m叉的B-树比二叉搜索树的高度大大降低？"><a href="#为什么m叉的B-树比二叉搜索树的高度大大降低？" class="headerlink" title="为什么m叉的B+树比二叉搜索树的高度大大降低？"></a>为什么m叉的B+树比二叉搜索树的高度大大降低？</h3><ol>
+<li>局部性原理，将一个节点的大小设为一页，一页<code>4K</code>，假设一个<code>KEY</code>有<code>8字节</code>，一个节点可以存储<code>500</code>个<code>KEY</code>，即<code>j=500</code>；</li>
+<li><code>m</code>叉树，大概<code>m/2&lt;= j &lt;=m</code>，即可以差不多是<code>1000</code>叉树；</li>
+<li>那么：<ul>
+<li>一层树：1个节点，<code>1 * 500</code>个<code>KEY</code>，大小<code>4K</code>；</li>
+<li>二层树：<code>1000</code>个节点，<code>1000 * 500 = 50W</code>个<code>KEY</code>，大小<code>1000 * 4K = 4M</code>；</li>
+<li>三层树：<code>1000 * 1000</code>个节点，<code>1000 * 1000 * 500 = 5亿</code>个<code>KEY</code>，大小<code>1000 * 1000 * 4K = 4G</code>；</li>
+</ul>
+</li>
+</ol>
+<h2 id="索引在InnoDB中怎么存储的？"><a href="#索引在InnoDB中怎么存储的？" class="headerlink" title="索引在InnoDB中怎么存储的？"></a>索引在InnoDB中怎么存储的？</h2><p><code>frm</code>存储表结构；</p>
+<p><code>.ibd</code>和<code>.ibdata</code>分别存储 索引 + 数据；</p>
+<h3 id="InnoDB如何存储表数据的？（存储结构）"><a href="#InnoDB如何存储表数据的？（存储结构）" class="headerlink" title="InnoDB如何存储表数据的？（存储结构）"></a>InnoDB如何存储表数据的？（存储结构）</h3><p><strong>将数据划分为若干个页</strong>，以页作为磁盘和内存之间交互的基本单位，<code>InnoDB</code>中页的大小一般为 <code>16 KB</code>。</p>
+<p>也就是在一般情况下，一次最少从磁盘中读取<code>16KB</code>的内容到内存中，一次最少把内存中的<code>16KB</code>内容刷新到磁盘中。</p>
+<ul>
+<li><code>InnoDB</code>其实是使用<code>页</code>为基本单位来管理存储空间的，默认的<code>页</code>大小为<code>16KB</code>。</li>
+<li>对于<code>InnoDB</code>存储引擎来说，每个索引都对应着一棵<code>B+</code>树，该<code>B+</code>树的每个节点都是一个数据页，数据页之间不必要是物理连续的，因为数据页之间有<code>双向链表</code>来维护着这些页的顺序。</li>
+<li><code>InnoDB</code>的聚簇索引的叶子节点存储了完整的用户记录，也就是所谓的索引即数据，数据即索引。</li>
+</ul>
+<p>为了更好的管理这些页，InnoDB使用了一个<code>表空间</code>或者<code>文件空间</code>（英文名：<code>table space</code>或者<code>file space</code>）的概念，这个表空间是一个抽象的概念，它可以对应文件系统上一个或多个真实文件（不同表空间对应的文件数量可能不同）。</p>
+<p>每一个<code>表空间</code>可以被划分为很多很多很多个<code>页</code>，我们的表数据就存放在某个<code>表空间</code>下的某些页里。</p>
+<p>下面详细描述下：</p>
+<h4 id="共享表存储（system-tablespace-系统表空间）"><a href="#共享表存储（system-tablespace-系统表空间）" class="headerlink" title="共享表存储（system tablespace - 系统表空间）"></a>共享表存储（system tablespace - 系统表空间）</h4><p><code>系统表空间</code>可以对应文件系统上一个或多个实际的文件，默认情况下，<code>InnoDB</code>会在<code>数据目录</code>下创建一个名为<code>ibdata1</code>（在你的数据目录下找找看有木有）、大小为<code>12M</code>的文件，这个文件就是对应的<code>系统表空间</code>在文件系统上的表示。</p>
+<p>这个文件是所谓的<code>自扩展文件</code>，也就是当不够用的时候它会自己增加文件大小，我们也可以自己修改这个值。</p>
+<p>比如：</p>
+<figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">innodb_data_file_path=data1:512M;data2:512M:autoextend</span><br></pre></td></tr></table></figure>
+
+<p>如上表示：</p>
+<p><code>MySql</code>启动后，会创建两个<code>512M</code>大小的文件作为系统表空间，然后末尾的<code>autoextend</code>表示这两个文件不够用则会自动扩展<code>data2</code>文件大小。</p>
+<p>所有表的数据文件和索引文件都保存在一个表空间里，一个表空间可以有多个文件，通过<code>innodb_data_file_path</code>和<code>innodb_data_home_dir</code>参数设置共享表空间的位置和名字，一般共享表空间的名字叫<code>ibdata1-n</code>。</p>
+<p><strong>注：</strong></p>
+<p><strong>在一个MySql服务器中，系统表空间就一份。</strong></p>
+<p><strong>且，从<code>MySQL5.5.7</code>到<code>MySQL5.6.6</code>之间的各个版本中，我们表中的数据都会被默认存储到这个 <em>系统表空间</em>。</strong></p>
+<h4 id="多表存储（file-per-table-tablespace-独立表空间）"><a href="#多表存储（file-per-table-tablespace-独立表空间）" class="headerlink" title="多表存储（file-per-table tablespace - 独立表空间）"></a>多表存储（file-per-table tablespace - 独立表空间）</h4><p>在<code>MySQL5.6.6</code>以及之后的版本中，<code>InnoDB</code>并不会默认的把各个表的数据存储到系统表空间中，而是为每一个表建立一个独立表空间，也就是说我们创建了多少个表，就有多少个独立表空间。</p>
+<p>使用<code>独立表空间</code>来存储表数据的话，会在该表所属数据库对应的子目录下创建一个表示该<code>独立表空间</code>的文件，文件名和表名相同，只不过添加了一个<code>.ibd</code>的扩展名而已，所以完整的文件名称长这样：<code>表名.ibd</code>。（每个表都有一个表空间文件用于存储每个表的数据和索引，文件名以表名开头，以<code>.ibd</code>为扩展名。）</p>
+<p>比如使用独立表空间存储<code>test</code>表的话，那么在当前db对应的数据库目录下就会为<code>test</code>表创建如下文件：</p>
+<figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">test.frm</span><br><span class="line">test.ibd</span><br></pre></td></tr></table></figure>
+
+
+
+<p>也可以将已存在的系统表空间转移到独立表空间：</p>
+<figure class="highlight sql"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">ALTER</span> <span class="keyword">TABLE</span> 表名 <span class="keyword">TABLESPACE</span> [=] innodb_file_per_table;</span><br></pre></td></tr></table></figure>
+
+<p>或者，将已经存在表空间的表转移到系统表空间：</p>
+<figure class="highlight sql"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">ALTER</span> <span class="keyword">TABLE</span> 表名 <span class="keyword">TABLESPACE</span> [=] innodb_system;</span><br></pre></td></tr></table></figure>
+
+
+
+<h3 id="InnoDB如何访问这些表数据的？"><a href="#InnoDB如何访问这些表数据的？" class="headerlink" title="InnoDB如何访问这些表数据的？"></a>InnoDB如何访问这些表数据的？</h3>
+      </div>
+      
+        <div class="prev-or-next">
+          <div class="post-foot-next">
+            
+              <a href="/2020/07/30/%E9%9D%A2%E8%AF%95%E5%AE%98%EF%BC%9A%E8%AF%B4%E8%AF%B4%E7%B1%BB%E5%8A%A0%E8%BD%BD%E6%9C%BA%E5%88%B6%E4%B8%8E%E7%B1%BB%E5%8A%A0%E8%BD%BD%E5%99%A8%EF%BC%9F%E5%A6%82%E4%BD%95%E6%89%93%E7%A0%B4%E5%91%A2%EF%BC%9F/" target="_self">
+                <i class="iconfont icon-chevronleft"></i>
+                <span>PREV</span>
+              </a>
+            
+          </div>
+          <div class="post-attach">
+            <span class="post-pubtime">2020-07-31</span>
+            
+                  <span class="post-tags">
+                    <i class="iconfont icon-tags" title="标签 | tags"></i>
+                    
+                    <span class="span--tag">
+                      <a href="/tags/MySql/" title="查看 MySql 标签">
+                        <b>#</b> MySql
+                      </a>
+                    </span>
+                    
+                    <span class="span--tag">
+                      <a href="/tags/InnoDB/" title="查看 InnoDB 标签">
+                        <b>#</b> InnoDB
+                      </a>
+                    </span>
+                    
+                    <span class="span--tag">
+                      <a href="/tags/%E7%B4%A2%E5%BC%95/" title="查看 索引 标签">
+                        <b>#</b> 索引
+                      </a>
+                    </span>
+                    
+                  </span>
+              
+          </div>
+          <div class="post-foot-prev">
+            
+              <a href="/2020/08/01/JVM%E4%B8%AD%E5%B9%B6%E5%8F%91%E5%9E%83%E5%9C%BE%E5%9B%9E%E6%94%B6%E5%99%A8%E5%A6%82%E4%BD%95%E8%A7%A3%E5%86%B3%E5%A4%9A%E6%A0%87%E3%80%81%E6%BC%8F%E6%A0%87%E9%97%AE%E9%A2%98%EF%BC%9F/" target="_self">
+                <span>NEXT</span>
+                <i class="iconfont icon-chevronright"></i>
+              </a>
+            
+          </div>
+        </div>
+      
+    </div>
+    
+  <div class="post-catalog" id="catalog">
+    <div class="title">目录</div>
+    <div class="catalog-content">
+      <ol class="toc"><li class="toc-item toc-level-2"><a class="toc-link" href="#首先看什么是索引？"><span class="toc-text">首先看什么是索引？</span></a><ol class="toc-child"><li class="toc-item toc-level-3"><a class="toc-link" href="#优点"><span class="toc-text">优点</span></a></li></ol></li><li class="toc-item toc-level-2"><a class="toc-link" href="#在MySql中的索引为什么是B-树结构？"><span class="toc-text">在MySql中的索引为什么是B+树结构？</span></a><ol class="toc-child"><li class="toc-item toc-level-3"><a class="toc-link" href="#Hash"><span class="toc-text">Hash</span></a><ol class="toc-child"><li class="toc-item toc-level-4"><a class="toc-link" href="#特点"><span class="toc-text">特点</span></a></li><li class="toc-item toc-level-4"><a class="toc-link" href="#缺点"><span class="toc-text">缺点</span></a></li><li class="toc-item toc-level-4"><a class="toc-link" href="#时间复杂度"><span class="toc-text">时间复杂度</span></a></li><li class="toc-item toc-level-4"><a class="toc-link" href="#空间复杂度"><span class="toc-text">空间复杂度</span></a></li></ol></li><li class="toc-item toc-level-3"><a class="toc-link" href="#二叉查找树"><span class="toc-text">二叉查找树</span></a><ol class="toc-child"><li class="toc-item toc-level-4"><a class="toc-link" href="#特点-1"><span class="toc-text">特点</span></a></li><li class="toc-item toc-level-4"><a class="toc-link" href="#缺点-1"><span class="toc-text">缺点</span></a></li><li class="toc-item toc-level-4"><a class="toc-link" href="#时间复杂度-1"><span class="toc-text">时间复杂度</span></a></li></ol></li><li class="toc-item toc-level-3"><a class="toc-link" href="#平衡二叉树（AVL）"><span class="toc-text">平衡二叉树（AVL）</span></a><ol class="toc-child"><li class="toc-item toc-level-4"><a class="toc-link" href="#特点-2"><span class="toc-text">特点</span></a></li><li class="toc-item toc-level-4"><a class="toc-link" href="#缺点-2"><span class="toc-text">缺点</span></a><ol class="toc-child"><li class="toc-item toc-level-5"><a class="toc-link" href="#LL"><span class="toc-text">LL</span></a></li><li class="toc-item toc-level-5"><a class="toc-link" href="#LR"><span class="toc-text">LR</span></a></li><li class="toc-item toc-level-5"><a class="toc-link" href="#RL"><span class="toc-text">RL</span></a></li><li class="toc-item toc-level-5"><a class="toc-link" href="#RR"><span class="toc-text">RR</span></a></li></ol></li><li class="toc-item toc-level-4"><a class="toc-link" href="#时间复杂度-2"><span class="toc-text">时间复杂度</span></a></li></ol></li><li class="toc-item toc-level-3"><a class="toc-link" href="#红黑树（Red-Black-Tree）"><span class="toc-text">红黑树（Red-Black Tree）</span></a><ol class="toc-child"><li class="toc-item toc-level-4"><a class="toc-link" href="#特点-3"><span class="toc-text">特点</span></a></li><li class="toc-item toc-level-4"><a class="toc-link" href="#缺点-3"><span class="toc-text">缺点</span></a></li><li class="toc-item toc-level-4"><a class="toc-link" href="#时间复杂度-3"><span class="toc-text">时间复杂度</span></a></li><li class="toc-item toc-level-4"><a class="toc-link" href="#相关面试问题"><span class="toc-text">相关面试问题</span></a><ol class="toc-child"><li class="toc-item toc-level-5"><a class="toc-link" href="#jdk-1-8-HashMap-中有使用到红黑树，你知道触发条件是什么吗？有读过源码是如何-put-和-remove-的吗？"><span class="toc-text">jdk 1.8 HashMap 中有使用到红黑树，你知道触发条件是什么吗？有读过源码是如何 put 和 remove 的吗？</span></a></li><li class="toc-item toc-level-5"><a class="toc-link" href="#java中TreeMap内对红黑树如何操作的？比如插入节点后、删除节点后？"><span class="toc-text">java中TreeMap内对红黑树如何操作的？比如插入节点后、删除节点后？</span></a></li></ol></li></ol></li><li class="toc-item toc-level-3"><a class="toc-link" href="#B-树（平衡多路查找树）"><span class="toc-text">B-树（平衡多路查找树）</span></a><ol class="toc-child"><li class="toc-item toc-level-4"><a class="toc-link" href="#特点-4"><span class="toc-text">特点</span></a></li><li class="toc-item toc-level-4"><a class="toc-link" href="#缺点-4"><span class="toc-text">缺点</span></a></li></ol></li><li class="toc-item toc-level-3"><a class="toc-link" href="#B-树"><span class="toc-text">B+树</span></a><ol class="toc-child"><li class="toc-item toc-level-4"><a class="toc-link" href="#特点-5"><span class="toc-text">特点</span></a></li><li class="toc-item toc-level-4"><a class="toc-link" href="#伪Hash索引"><span class="toc-text">伪Hash索引</span></a></li></ol></li><li class="toc-item toc-level-3"><a class="toc-link" href="#为什么m叉的B-树比二叉搜索树的高度大大降低？"><span class="toc-text">为什么m叉的B+树比二叉搜索树的高度大大降低？</span></a></li></ol></li><li class="toc-item toc-level-2"><a class="toc-link" href="#索引在InnoDB中怎么存储的？"><span class="toc-text">索引在InnoDB中怎么存储的？</span></a><ol class="toc-child"><li class="toc-item toc-level-3"><a class="toc-link" href="#InnoDB如何存储表数据的？（存储结构）"><span class="toc-text">InnoDB如何存储表数据的？（存储结构）</span></a><ol class="toc-child"><li class="toc-item toc-level-4"><a class="toc-link" href="#共享表存储（system-tablespace-系统表空间）"><span class="toc-text">共享表存储（system tablespace - 系统表空间）</span></a></li><li class="toc-item toc-level-4"><a class="toc-link" href="#多表存储（file-per-table-tablespace-独立表空间）"><span class="toc-text">多表存储（file-per-table tablespace - 独立表空间）</span></a></li></ol></li><li class="toc-item toc-level-3"><a class="toc-link" href="#InnoDB如何访问这些表数据的？"><span class="toc-text">InnoDB如何访问这些表数据的？</span></a></li></ol></li></ol>
+    </div>
+  </div>
+
+  
+<script src="/js/catalog.js"></script>
+
+
+
+
+    
+      <div class="comments-container">
+        
+
+
+  <script src='//unpkg.com/valine/dist/Valine.min.js'></script>
+
+  <div id="vcomments"></div>
+
+  <script>
+    new Valine({
+      el: '#vcomments',
+      appId: 'bSYdbCIyQHwCwv9NC9Fes7mU-gzGzoHsz',
+      appKey: 'zuj9HNh3w0O1O5t1nR1yeNHD',
+      placeholder: '说出你的想法...',
+      avatar: 'retro'
+    })
+  </script>
+
+    <style>
+      .comments-container .v .vempty {
+        display: none!important;
+      }
+    </style>
+
+
+
+
+      </div>
+    
+  </div>
+
+  
+        <div class="footer">
+  <div class="social">
+    <ul>
+      
+        <li>
+          <a title="github" href="https://github.com/YYZ-coder" target="_blank" rel="noopener">
+            <i class="iconfont icon-github"></i>
+          </a>
+        </li>
+      
+        <li>
+          <a title="rss" href="/atom.xml">
+            <i class="iconfont icon-rss"></i>
+          </a>
+        </li>
+      
+    </ul>
+  </div>
+  
+    <div class="footer-more">
+      <a href="">Copyright © YYZ-coder 2020</a>
+    </div>
+  
+    <div class="footer-more">
+      <a href="https://github.com/zchengsite/hexo-theme-oranges" target="_blank" rel="noopener">Theme by Oranges | Powered by Hexo</a>
+    </div>
+  
+</div>
+
+      </div>
+
+      <div class="back-to-top hidden">
+  <a href="javascript: void(0)">
+    <i class="iconfont icon-chevronup"></i>
+  </a>
+</div>
+
+
+<script src="/js/backtotop.js"></script>
+
+
+
+    </div>
+  </body>
+</html>
