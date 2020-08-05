@@ -1,0 +1,658 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+  <head>
+  <meta charset="utf-8">
+  <meta name="author" content="zchengsite, 1451426471@qq.com" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  
+  
+  <title>面试官：讲讲分布式事务？ | coder的特殊身份</title>
+
+  
+    <link rel="apple-touch-icon" href="/images/favicon.png">
+    <link rel="icon" href="/images/favicon.png">
+  
+
+  <!-- Raleway-Font -->
+  <link href="https://fonts.googleapis.com/css?family=Raleway&display=swap" rel="stylesheet">
+
+  <!-- hexo site css -->
+  
+<link rel="stylesheet" href="/css/base.css">
+<link rel="stylesheet" href="/iconfont/iconfont.css">
+<link rel="stylesheet" href="/css/github-markdown.css">
+<link rel="stylesheet" href="/css/highlight.css">
+
+
+  <!-- jquery3.3.1 -->
+  <script src="https://cdn.bootcss.com/jquery/3.3.1/jquery.min.js"></script>
+
+  <!-- fancybox -->
+  <link href="https://cdn.bootcss.com/fancybox/3.5.2/jquery.fancybox.min.css" rel="stylesheet">
+  <script async src="https://cdn.bootcss.com/fancybox/3.5.2/jquery.fancybox.min.js"></script>
+  
+<script src="/js/fancybox.js"></script>
+
+
+  
+
+<meta name="generator" content="Hexo 4.2.1"></head>
+
+
+  <body>
+    <div id="app">
+      <div class="header">
+  <div class="avatar">
+    <a href="/"><img src="/images/avatar.png" alt=""></a>
+    <div class="nickname"><a href="/"></a></div>
+  </div>
+  <div class="navbar">
+    <ul>
+      
+        <li class="nav-item" data-path="/">
+          <a href="/">主页</a>
+        </li>
+      
+        <li class="nav-item" data-path="/archives/">
+          <a href="/archives/">归档</a>
+        </li>
+      
+        <li class="nav-item" data-path="/categories/">
+          <a href="/categories/">分类</a>
+        </li>
+      
+        <li class="nav-item" data-path="/tags/">
+          <a href="/tags/">标签</a>
+        </li>
+      
+        <li class="nav-item" data-path="/about/">
+          <a href="/about/">关于</a>
+        </li>
+      
+    </ul>
+  </div>
+</div>
+
+
+<script src="/js/activeNav.js"></script>
+
+
+
+      <div class="flex-container">
+        <!-- 文章详情页，展示文章具体内容，url形式：https://yoursite/文章标题/ -->
+<!-- 同时为「标签tag」，「朋友friend」，「分类categories」，「关于about」页面的承载页面，具体展示取决于page.type -->
+
+
+  
+  
+  
+  
+  
+  
+  
+  
+  <!-- 文章内容页 url形式：https://yoursite/文章标题/ -->
+  <div class="container post-details" id="post-details">
+    <div class="post-content">
+      <div class="post-title">面试官：讲讲分布式事务？</div>
+      <div class="post-attach">
+        <span class="post-pubtime">2020-08-05</span>
+        
+              <span class="post-tags">
+                <i class="iconfont icon-tags" title="标签 | tags"></i>
+                
+                <span class="span--tag">
+                  <a href="/tags/java/" title="查看 java 标签">
+                    <b>#</b> java
+                  </a>
+                </span>
+                
+                <span class="span--tag">
+                  <a href="/tags/%E5%88%86%E5%B8%83%E5%BC%8F/" title="查看 分布式 标签">
+                    <b>#</b> 分布式
+                  </a>
+                </span>
+                
+                <span class="span--tag">
+                  <a href="/tags/%E4%BA%8B%E5%8A%A1/" title="查看 事务 标签">
+                    <b>#</b> 事务
+                  </a>
+                </span>
+                
+              </span>
+          
+      </div>
+      <div class="markdown-body">
+        <h2 id="分布式事务"><a href="#分布式事务" class="headerlink" title="分布式事务"></a>分布式事务</h2><p>随着互联网高速发展，事务的参与者、支持事务的服务器、资源服务器以及事务管理器分别位于不同的分布式系统的不同节点 之上。简单的说，就是一次大的操作由不同的小操作组成，这些小的操作分布在不同的服务器上，且属于不同的应用。</p>
+<p>在这种环境中，我们之前说过数据库的 <code>ACID</code> 四大特性，已经无法满足我们分布式事务。</p>
+<p><strong>本质上来说，分布式事务就是为了保证不同数据库的数据一致性。</strong></p>
+<p>比如如下业务图：</p>
+<p><img src="http://qd2x6jysb.bkt.clouddn.com/image-20200805193919210.png" alt="image-20200805193919210"></p>
+<h3 id="CAP理论"><a href="#CAP理论" class="headerlink" title="CAP理论"></a>CAP理论</h3><p>又被叫作布鲁尔定理。</p>
+<p><code>CAP</code> 指的是：<strong>一致性（<code>Consistency</code>）、可用性（<code>Availability</code>）、分区容错性（<code>Partition tolerance</code>）</strong>。</p>
+<p><code>CAP</code> 定律说的是，<strong>在一个分布式系统中，最多只能满足 C、A、P 中的两个，不可能三个同时满足。</strong></p>
+<p>而在分布式系统中，网络无法 <code>100%</code>可靠，分区其实是一个必然现象。</p>
+<p>如果我们选择了 CA 而放弃了 P，那么当发生分区现象时，为了保证一致性，这个时候必须拒绝请求，但是 A 又不允许，所以分布式系统理论上不可能选择 CA 架构，只能选择 CP 或者 AP 架构。</p>
+<p>而且，显然，任何横向扩展策略都要依赖于数据分区。因此，设计人员必须在一致性与可用性之间做出选择。</p>
+<h4 id="一致性（Consistency）"><a href="#一致性（Consistency）" class="headerlink" title="一致性（Consistency）"></a>一致性（<code>Consistency</code>）</h4><blockquote>
+<p>引自：《从Paxos到Zookeeper分布式一致性原理与实践》</p>
+<p><img src="http://qd2x6jysb.bkt.clouddn.com/image-20200805194731623.png" alt="image-20200805194731623"></p>
+</blockquote>
+<h4 id="可用性（Availability）"><a href="#可用性（Availability）" class="headerlink" title="可用性（Availability）"></a>可用性（<code>Availability</code>）</h4><p>可用性指系统提供的服务必须一直处于可用状态，对于用户每一个操作请求总是能够在<strong>有限时间</strong>内<strong>返回结果</strong>。</p>
+<blockquote>
+<p>引自：《从Paxos到Zookeeper分布式一致性原理与实践》</p>
+<ul>
+<li><p>有限时间：</p>
+<p>对于用户的一个操作请求，系统必须能够在指定时间（响应时间）内返回对应的处理结果，如果超过这个时间范围，则系统被认为不可用。</p>
+</li>
+<li><p>返回结果：</p>
+<p>它要求系统在完成对用户请求的处理后，返回一个正常的响应结果。正常的响应结构通常能明确反应出对请求的处理结果，即成功、失败。</p>
+</li>
+</ul>
+</blockquote>
+<p><img src="http://qd2x6jysb.bkt.clouddn.com/image-20200805195823749.png" alt="image-20200805195823749"></p>
+<h3 id="BASE理论"><a href="#BASE理论" class="headerlink" title="BASE理论"></a>BASE理论</h3><p>往往在分布式系统中无法实现完全一致性，于是有了 BASE 理论，它是对 CAP 定律的进一步扩充。</p>
+<p><strong>BASE</strong> 指的是：</p>
+<ul>
+<li><strong>（<code>BA</code>）<code>Basically Available</code>（基本可用）</strong> ： 分布式系统在出现故障时，<strong>允许损失部分可用功能，保证核心功能可用</strong>；</li>
+<li><strong>（<code>S</code>）<code>Soft state</code>（软状态）</strong> ： 允许系统中存在中间状态，这个状态不影响系统可用性；</li>
+<li><strong>（<code>E</code>）<code>Eventually consistent</code>（最终一致性）</strong> ： 经过一段时间后，所有节点数据都将会达到一致</li>
+</ul>
+<h2 id="刚性事务"><a href="#刚性事务" class="headerlink" title="刚性事务"></a>刚性事务</h2><ul>
+<li><strong>A：(<code>Atomicity</code>) 原子性</strong></li>
+<li><strong>C：(<code>Consistency</code>)  一致性</strong></li>
+<li><strong>I：(<code>Isolation</code>)  隔离性（<code>MVCC</code>）</strong></li>
+<li><strong>D：(<code>Durability</code>)  持久性</strong></li>
+</ul>
+<h3 id="Spring事务"><a href="#Spring事务" class="headerlink" title="Spring事务"></a>Spring事务</h3><h4 id="编程式事务"><a href="#编程式事务" class="headerlink" title="编程式事务"></a>编程式事务</h4><ul>
+<li><p>使用<code>TransactionTemplate</code>；</p>
+<figure class="highlight xml"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line"><span class="tag">&lt;<span class="name">bean</span> <span class="attr">id</span>=<span class="string">"transactionTemplate"</span> <span class="attr">class</span>=<span class="string">"org.springframework.transaction.support.TransactionTemplate"</span>&gt;</span></span><br><span class="line">    <span class="tag">&lt;<span class="name">property</span> <span class="attr">name</span>=<span class="string">"transactionManager"</span> <span class="attr">ref</span>=<span class="string">"transactionManager"</span>/&gt;</span></span><br><span class="line"><span class="tag">&lt;/<span class="name">bean</span>&gt;</span></span><br></pre></td></tr></table></figure>
+
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line">transactionTemplate.execute(<span class="keyword">new</span> TransactionCallback() &#123;</span><br><span class="line">      <span class="function"><span class="keyword">public</span> Object <span class="title">doInTransaction</span><span class="params">(TransactionStatus transactionStatus)</span> </span>&#123;&#125;</span><br><span class="line">          ....</span><br><span class="line">      &#125;</span><br><span class="line">  &#125;);</span><br></pre></td></tr></table></figure>
+
+
+
+</li>
+</ul>
+<ul>
+<li>直接使用<code>PlatformTransactionManager</code>实现；</li>
+</ul>
+<h4 id="声明式事务"><a href="#声明式事务" class="headerlink" title="声明式事务"></a>声明式事务</h4><p><strong>声明式事务</strong>管理建立在<code>AOP</code>之上，其本质是对方法前后进行拦截，然后在目标方法开始之前创建或者加入一个事务，执行完目标方法之后根据执行的情况提交或者回滚。</p>
+<p><strong>编程式事务</strong>每次实现都要单独实现，但业务量大功能复杂时，使用编程式事务无疑是痛苦的，而声明式事务不同，声明式事务属于无侵入式，不会影响业务逻辑的实现，只需要在配置文件中做相关的事务规则声明或者通过注解的方式，便可以将事务规则应用到业务逻辑中。</p>
+<p>显然<u>声明式事务管理要优于编程式事务管理</u>，这正是<code>Spring</code>倡导的非侵入式的编程方式。</p>
+<p>唯一不足的地方就是<strong>声明式事务管理的粒度是方法级别</strong>，而<strong>编程式事务管理是可以到代码块</strong>的，但是可以通过提取方法的方式完成声明式事务管理的配置。</p>
+<p>声明式事务实现四种方式：</p>
+<ul>
+<li>基于<code>TransactionInterceptor</code>的声明式事务；</li>
+<li>基于<code>TransactionProxyFactoryBean</code>的声明式事务；</li>
+<li>基于<strong>命名空间</strong>的声明式事务；</li>
+<li>基于注解 <code>@Transactional</code> 的声明式事务；</li>
+</ul>
+<h4 id="隔离级别"><a href="#隔离级别" class="headerlink" title="隔离级别"></a>隔离级别</h4><table>
+<thead>
+<tr>
+<th>隔离级别</th>
+<th>含义</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>ISOLATION_DEFAULT</code></td>
+<td>使用后端数据库默认的隔离级别。</td>
+</tr>
+<tr>
+<td><code>ISOLATION_READ_UNCOMMITTED</code></td>
+<td>允许读取尚未提交的更改。可能导致脏读、幻读或不可重复读。</td>
+</tr>
+<tr>
+<td><code>ISOLATION_READ_COMMITTED</code></td>
+<td>（<code>Oracle</code> 默认级别）允许从已经提交的并发事务读取。可防止脏读，但幻读和不可重复读仍可能会发生。</td>
+</tr>
+<tr>
+<td><code>ISOLATION_REPEATABLE_READ</code></td>
+<td>（<code>MYSQL</code> 默认级别）对相同字段的多次读取的结果是一致的，除非数据被当前事务本身改变。可防止脏读和不可重复读，但幻读仍可能发生。</td>
+</tr>
+<tr>
+<td><code>ISOLATION_SERIALIZABLE</code></td>
+<td>完全服从<code>ACID</code>的隔离级别，确保不发生脏读、不可重复读和幻影读。这在所有隔离级别中也是最慢的，因为它通常是通过完全锁定当前事务所涉及的数据表来完成的。</td>
+</tr>
+</tbody></table>
+<h4 id="事务传播机制"><a href="#事务传播机制" class="headerlink" title="事务传播机制"></a>事务传播机制</h4><p>事务的传播性一般用在事务嵌套的场景，比如一个事务方法里面调用了另外一个事务方法，那么两个方法是各自作为独立的方法提交还是内层的事务合并到外层的事务一起提交，这就是需要事务传播机制的配置来确定怎么样执行。（<code>TransactionDefinition</code>）</p>
+<table>
+<thead>
+<tr>
+<th>传播机制</th>
+<th>释义</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>PROPAGATION_REQUIRED</code>（默认）</td>
+<td>如果外层有事务，则当前事务加入到外层事务，一块提交，一块回滚。如果外层没有事务，新建一个事务执行。</td>
+</tr>
+<tr>
+<td><code>PROPAGATION_REQUES_NEW</code></td>
+<td>该事务传播机制是每次都会新开启一个事务，同时把外层事务挂起，当当前事务执行完毕，恢复上层事务的执行。如果外层没有事务，执行当前新开启的事务即可。</td>
+</tr>
+<tr>
+<td><code>PROPAGATION_SUPPORT</code></td>
+<td>如果外层有事务，则加入外层事务，如果外层没有事务，则直接使用非事务方式执行。完全依赖外层的事务。</td>
+</tr>
+<tr>
+<td><code>PROPAGATION_NOT_SUPPORT</code></td>
+<td>该传播机制不支持事务，如果外层存在事务则挂起，执行完当前代码，则恢复外层事务，无论是否异常都不会回滚当前的代码。</td>
+</tr>
+<tr>
+<td><code>PROPAGATION_NEVER</code></td>
+<td>该传播机制不支持外层事务，即如果外层有事务就抛出异常。</td>
+</tr>
+<tr>
+<td><code>PROPAGATION_MANDATORY</code></td>
+<td>与NEVER相反，如果外层没有事务，则抛出异常。</td>
+</tr>
+<tr>
+<td><code>PROPAGATION_NESTED</code></td>
+<td>可以保存状态保存点，当前事务回滚到某一个点，从而避免所有的嵌套事务都回滚，即各自回滚各自的，如果子事务没有把异常吃掉，基本还是会引起全部回滚的。</td>
+</tr>
+</tbody></table>
+<h4 id="事务超时"><a href="#事务超时" class="headerlink" title="事务超时"></a>事务超时</h4><p>为了使一个应用程序很好地执行，它的事务不能运行太长时间。因此，声明式事务的下一个特性就是它的超时。</p>
+<p>假设事务的运行时间变得格外的长，由于事务可能涉及对数据库的锁定，所以长时间运行的事务会不必要地占用数据库资源。这时就可以声明一个事务在特定秒数后自动回滚，不必等它自己结束。</p>
+<p>由于超时时钟在一个事务启动的时候开始的，因此，只有对于那些具有可能启动一个新事务的传播行为（<code>PROPAGATION_REQUIRES_NEW</code>、<code>PROPAGATION_REQUIRED</code>、<code>ROPAGATION_NESTED</code>）的方法来说，声明事务超时才有意义。</p>
+<h3 id="XA协议"><a href="#XA协议" class="headerlink" title="XA协议"></a>XA协议</h3><p>包含两部分：</p>
+<ul>
+<li><strong>事务管理器；</strong></li>
+<li><strong>本地资源管理器；</strong></li>
+</ul>
+<h4 id="DTP（Distributed-Transaction-Processing，分布式事务处理，简称DTP）模型元素"><a href="#DTP（Distributed-Transaction-Processing，分布式事务处理，简称DTP）模型元素" class="headerlink" title="DTP（Distributed Transaction Processing，分布式事务处理，简称DTP）模型元素"></a>DTP（Distributed Transaction Processing，分布式事务处理，简称DTP）模型元素</h4><ul>
+<li><strong>应用程序（Application Program ，简称AP）：</strong>用于定义事务边界(即定义事务的开始和结束)，并且在事务边界内对资源进行操作。</li>
+<li><strong>资源管理器（Resource Manager，简称RM）：</strong>如数据库、文件系统等，并提供访问资源的方式。</li>
+<li><strong>事务管理器（Transaction Manager ，简称TM）：</strong>负责分配事务唯一标识，监控事务的执行进度，并负责事务的提交、回滚等。</li>
+<li><strong>通信资源管理器（Communication Resource Manager，简称CRM）：</strong>控制一个TM域(TM domain)内或者跨TM域的分布式应用之间的通信。</li>
+<li><strong>通信协议（Communication Protocol，简称CP）：</strong>提供CRM提供的分布式应用节点之间的底层通信服务。</li>
+</ul>
+<p>一个<code>DTP</code>模型实例至少由三个组成部分：<code>AP(Application)</code>，<code>RMs(Resource Manager)</code>，<code>TM(Transaction Manager)</code>：</p>
+<p><img src="http://qd2x6jysb.bkt.clouddn.com/image-20200805221833232.png" alt="image-20200805221833232"></p>
+<h3 id="2PC"><a href="#2PC" class="headerlink" title="2PC"></a>2PC</h3><p><strong>XA协议对其进行了优化。</strong></p>
+<p><code>2PC</code>，将事务的提交过程分为：<strong>准备阶段、提交阶段</strong>。</p>
+<p><img src="http://qd2x6jysb.bkt.clouddn.com/image-20200805134737350.png" width="45%"/><img src="http://qd2x6jysb.bkt.clouddn.com/image-20200805134748857.png" width="45%"/></p>
+<p>事务的发起者称协调者，事务的执行者称参与者。</p>
+<ul>
+<li><p><strong>阶段1：准备阶段</strong></p>
+<ol>
+<li><p>协调者向所有参与者发送事务内容，询问是否可以提交事务，并等待所有参与者答复。</p>
+</li>
+<li><p>各参与者执行事务操作，但不提交事务。</p>
+</li>
+<li><p>如参与者执行成功，给协调者反馈<code>YES</code>，即可以提交；</p>
+<p>如执行失败，给协调者反馈<code>NO</code>，即不可提交。</p>
+</li>
+</ol>
+</li>
+<li><p><strong>阶段2：提交阶段</strong></p>
+<p>此阶段分两种情况：所有参与者均反馈<code>YES</code>、或任何一个参与者反馈<code>NO</code>。</p>
+<ul>
+<li>所有参与者均反馈<code>YES</code>时，即提交事务。</li>
+<li>任何一个参与者反馈<code>NO</code>时，即中断事务。</li>
+</ul>
+</li>
+</ul>
+<h4 id="XA对2PC的优化"><a href="#XA对2PC的优化" class="headerlink" title="XA对2PC的优化"></a>XA对2PC的优化</h4><ul>
+<li><strong>只读断言</strong></li>
+</ul>
+<p>在<code>Phase 1</code>中，<code>RM</code>可以断言“我这边不涉及数据增删改”来答复<code>TM</code>的<code>prepare</code>请求，从而让这个<code>RM</code>脱离当前的全局事务，从而免去了<code>Phase 2</code>。</p>
+<p>这种优化发生在其他<code>RM</code>都完成<code>prepare</code>之前的话，使用了只读断言的RM早于AP其他动作（比如说这个RM返回那些只读数据给AP）前，就释放了相关数据的上下文（比如读锁之类的），这时候其他全局事务或者本地事务就有机会去改变这些数据，结果就是无法保障整个系统的可序列化特性 —— 通俗点说那就会有脏读的风险。</p>
+<ul>
+<li><strong>一阶段提交</strong></li>
+</ul>
+<p>如果需要增删改的数据都在同一个<code>RM</code>上，TM<code>可以使用一阶段提交</code> —— 跳过两阶段提交中的<code>Phase 1</code>，直接执行<code>Phase 2</code>。</p>
+<p>这种优化的本质是跳过<code>Phase 1</code>，<code>RM</code>自行决定了事务分支的结果，并且在答复<code>TM</code>前就清除掉事务分支信息。</p>
+<p>对于这种优化的情况，<code>TM</code>实际上也没有必要去可靠的记录全局事务的信息，在一些异常的场景下，此时<code>TM</code>可能不知道事务分支的执行结果。 </p>
+<h4 id="优点"><a href="#优点" class="headerlink" title="优点"></a>优点</h4><p>尽量<strong>保证了数据的强一致</strong>，实现成本较低，在各大主流数据库都有自己实现，对于 <code>MySQL</code> 是从 <code>5.5</code>开始支持。</p>
+<h4 id="存在的问题"><a href="#存在的问题" class="headerlink" title="存在的问题"></a>存在的问题</h4><ol>
+<li><p><strong>同步阻塞</strong></p>
+<p>两阶段提交方案下全局事务的<code>ACID</code>特性，是依赖于<code>RM</code>（<code>Resource Manager</code>）的。</p>
+<p>例如，<code>MySql 5.7</code>对<code>XA</code>分布式事务的支持：</p>
+<blockquote>
+<p>参考：<a href="https://dev.mysql.com/doc/refman/5.7/en/xa.html" target="_blank" rel="noopener">13.3.7 XA Transactions</a></p>
+<p>A global transaction involves several actions that are transactional in themselves, but that all must either complete successfully as a group, or all be rolled back as a group. In essence, this extends ACID properties “up a level” so that multiple ACID transactions can be executed in concert as components of a global operation that also has ACID properties. (As with nondistributed transactions, <a href="https://dev.mysql.com/doc/refman/5.7/en/innodb-transaction-isolation-levels.html#isolevel_serializable" target="_blank" rel="noopener">SERIALIZABLE</a> may be preferred if your applications are sensitive to read phenomena. <a href="https://dev.mysql.com/doc/refman/5.7/en/innodb-transaction-isolation-levels.html#isolevel_repeatable-read" target="_blank" rel="noopener">REPEATABLE READ</a> may not be sufficient for distributed transactions.)</p>
+<p>译文：</p>
+<p>全局事务涉及多个本身具有事务性的操作，但是所有操作必须要么作为一个组成功完成，要么全部作为一个组回滚。 从本质上讲，这将ACID属性扩展到“一个级别”，以便可以将多个ACID事务作为具有ACID属性的全局操作的组成部分一起执行。 （与非分布式事务一样，如果您的应用程序对读取现象敏感，则SERIALIZABLE可能是首选。可重复读取可能不足以进行分布式事务。）</p>
+</blockquote>
+</li>
+</ol>
+<ol start="2">
+<li><p><strong>单点故障</strong></p>
+<p>由于协调者的重要性，一旦协调者<code>TM</code>发生故障。参与者<code>RM</code>会一直阻塞下去。</p>
+<p>尤其在第二阶段，协调者发生故障，那么所有的参与者还都处于锁定事务资源的状态中，而无法继续完成事务操作。（<strong>如果是协调者挂掉，可以重新选举一个协调者，但是无法解决因为协调者宕机导致的参与者处于阻塞状态的问题</strong>）。</p>
+</li>
+</ol>
+<ol start="3">
+<li><p><strong>数据不一致</strong></p>
+<p>在二阶段提交的阶段二中，当协调者向参与者发送<code>commit</code>请求之后，发生了局部网络异常或者在发送<code>commit</code>请求过程中协调者发生了故障，这回导致只有一部分参与者接受到了<code>commit</code>请求。</p>
+<p>而在这部分参与者接到<code>commit</code>请求之后就会执行<code>commit</code>操作。但是其他部分未接到<code>commit</code>请求的机器则无法执行事务提交。</p>
+<p>于是整个分布式系统便出现了数据不一致性的现象。</p>
+</li>
+</ol>
+<p><strong>注：</strong></p>
+<p><strong>两阶段提交方案锁定资源时间长，对性能影响很大，基本不适合解决微服务事务问题。</strong></p>
+<h3 id="3PC"><a href="#3PC" class="headerlink" title="3PC"></a>3PC</h3><p>减少锁表时间。（后两个阶段锁表）</p>
+<p><strong>与2PC对比改动点：</strong></p>
+<ol>
+<li><p><strong>引入超时机制。同时在协调者和参与者中都引入超时机制。</strong></p>
+</li>
+<li><p><strong>在第一阶段和第二阶段中插入一个准备阶段。</strong></p>
+<p><strong>保证了在最后提交阶段之前各参与节点的状态是一致的。也就是说，除了引入超时机制之外，<code>3PC</code>把<code>2PC</code>的准备阶段再次一分为二，这样三阶段提交就有<code>CanCommit</code>、<code>PreCommit</code>、<code>DoCommit</code>三个阶段。</strong></p>
+</li>
+</ol>
+<p>将 2PC 的 “提交事务请求” 过程一分为二。</p>
+<img src="http://qd2x6jysb.bkt.clouddn.com/image-20200805135809707.png" height="30%" width="50%"/>
+
+<p>3PC，三阶段提交协议，是2PC的改进版本，</p>
+<p>即将事务的提交过程分为<strong>CanCommit、PreCommit、do Commit</strong>三个阶段来进行处理。</p>
+<ul>
+<li><p><strong>阶段1：CanCommit</strong></p>
+<p>1、协调者向参与者发出<code>CanCommit</code>请求，询问是否可以提交事务，并等待所有参与者答复。</p>
+<p>2、参与者收到<code>CanCommit</code>请求后，如果认为可以执行事务操作，则反馈<code>YES</code>，否则反馈<code>NO</code>。</p>
+</li>
+<li><p><strong>阶段2：PreCommit</strong>　</p>
+<p>1、所有参与者均反馈<code>YES</code>，即执行事务预提交。</p>
+<p>2、任何一个参与者反馈<code>NO</code>，或者等待超时后协调者尚无法收到所有参与者的反馈，即中断事务。　　</p>
+</li>
+<li><p><strong>阶段3：do Commit</strong>　　</p>
+<p>1、所有参与者均反馈<code>Ack</code>响应，即执行真正的事务提交。</p>
+<p>2、任何一个参与者反馈<code>NO</code>，或者等待超时后协调者尚无法收到所有参与者的反馈，即中断事务。</p>
+</li>
+</ul>
+<h3 id="2PC与3PC区别"><a href="#2PC与3PC区别" class="headerlink" title="2PC与3PC区别"></a>2PC与3PC区别</h3><p>相对于<code>2PC</code>，<code>3PC</code>主要解决的<strong>单点故障问题</strong>，并<strong>减少阻塞</strong>，因为一旦参与者无法及时收到来自协调者的信息之后，他会默认执行<code>commit</code>。而不会一直持有事务资源并处于阻塞状态。但是这种机制也会<strong>导致数据一致性问题</strong>，因为，由于网络原因，协调者发送的<code>abort</code>响应没有及时被参与者接收到，那么参与者在等待超时之后执行了<code>commit</code>操作。这样就和其他接到<code>abort</code>命令并执行回滚的参与者之间存在数据不一致的情况。</p>
+<h2 id="柔性事务（软事务）"><a href="#柔性事务（软事务）" class="headerlink" title="柔性事务（软事务）"></a>柔性事务（软事务）</h2><p>==仅保证最终一致性。==</p>
+<ul>
+<li><p><strong>BA</strong>:Basic Availability 基本业务可用性</p>
+</li>
+<li><p><strong>S</strong>：Soft state 柔性状态（中间态不一致）</p>
+</li>
+<li><p><strong>E</strong> : Eventual consistency 最终一致性</p>
+</li>
+</ul>
+<p><strong>为了可用性，牺牲一致性</strong></p>
+<p><strong>难点：</strong></p>
+<p>业界尚未有特别成熟、大规模普及的无侵入性的框架方案</p>
+<h3 id="TCC（Try-Confirm-Cancel）"><a href="#TCC（Try-Confirm-Cancel）" class="headerlink" title="TCC（Try-Confirm-Cancel）"></a>TCC（Try-Confirm-Cancel）</h3><p><code>TCC</code>的作用主要是解决跨服务调用场景下的分布式事务问题。</p>
+<ul>
+<li><strong>Try阶段：</strong></li>
+</ul>
+<p>完成所有业务检查（一致性），预留业务资源（准隔离性）。</p>
+<ul>
+<li><strong>Confirm阶段：</strong></li>
+</ul>
+<p>确认执行业务操作，不做任何业务检查， 只使用Try阶段预留的业务资源。</p>
+<ul>
+<li><strong>Cancel阶段：</strong></li>
+</ul>
+<p>取消Try阶段预留的业务资源。</p>
+<p>开源方案：<code>tcc-transaction</code>、<code>ByteTCC</code>、<code>spring-cloud-rest-tcc</code>。</p>
+<p><img src="http://qd2x6jysb.bkt.clouddn.com/image-20200805225607753.png" alt="image-20200805225607753"></p>
+<h4 id="优点-1"><a href="#优点-1" class="headerlink" title="优点"></a>优点</h4><p><code>XA两阶段提交</code><strong>资源层面</strong>的，而<code>TCC</code>实际上把资源层面二阶段提交上提到了业务层面来实现。</p>
+<p>有效了的避免了<code>XA两阶段</code>提交<strong>占用资源锁时间过长导致的性能低下</strong>问题。</p>
+<h4 id="缺点"><a href="#缺点" class="headerlink" title="缺点"></a>缺点</h4><p>主业务服务和从业务服务都需要进行改造，从业务方改造成本更高。</p>
+<p>假如是航班预定案例，原来只需要提供一个购买接口，现在需要改造成<code>try</code>、<code>confirm</code>、<code>cancel3</code>个接口，开发成本高。</p>
+<h4 id="TCC与XA事务区别"><a href="#TCC与XA事务区别" class="headerlink" title="TCC与XA事务区别"></a>TCC与XA事务区别</h4><ul>
+<li><p><strong>XA是资源层面的分布式事务，强一致性，在两阶段提交的整个过程中，一直会持有资源的锁。</strong></p>
+<p><code>XA</code>事务中的两阶段提交内部过程是对开发者屏蔽的，回顾我们之前讲解<code>JTA</code>规范时，通过<code>UserTransaction</code>的<code>commit</code>方法来提交全局事务，这只是一次方法调用，其内部会委派给<code>TransactionManager</code>进行真正的两阶段提交，因此开发者从代码层面是感知不到这个过程的。</p>
+<p>而事务管理器在两阶段提交过程中，从<code>prepare</code>到<code>commit</code>/<code>rollback</code>过程中，<strong>资源实际上一直都是被加锁的</strong>。如果有其他人需要更新这两条记录，那么就必须等待锁释放。</p>
+</li>
+<li><p><strong>TCC是业务层面的分布式事务，最终一致性，不会一直持有资源的锁。</strong></p>
+<p><code>try</code>、<code>confirm</code>/<code>cancel</code>在执行过程中，一般都会开启各自的本地事务，来保证方法内部业务逻辑的<code>ACID</code>特性。其中：</p>
+<ol>
+<li><p><code>try</code>过程的本地事务，是保证资源预留的业务逻辑的正确性。</p>
+</li>
+<li><p><code>confirm</code>/<code>cancel</code>执行的本地事务逻辑确认/取消预留资源，以保证最终一致性，也就是所谓的<code>补偿型事务</code>(<code>Compensation-Based Transactions</code>)。</p>
+</li>
+</ol>
+</li>
+</ul>
+<h4 id="TCC模型与DTP模型异同"><a href="#TCC模型与DTP模型异同" class="headerlink" title="TCC模型与DTP模型异同"></a>TCC模型与DTP模型异同</h4><p><img src="http://qd2x6jysb.bkt.clouddn.com/image-20200805230747546.png" alt="image-20200805230747546"></p>
+<p><strong>1、<code>TCC</code>模型中的主业务服务相当于<code>DTP</code>模型中的<code>AP</code>，<code>TCC</code>模型中的从业务服务相当于 <code>DTP</code>模型中的<code>RM</code></strong></p>
+<p>在<code>DTP</code>模型中，应用AP操作多个资源管理器<code>RM</code>上的资源；</p>
+<p>而在<code>TCC</code>模型中，是主业务服务操作多个从业务服务上的资源。</p>
+<p>不同的是<code>DTP</code>模型中的资源提供者是类似于<code>Mysql</code>这种关系型数据库，而TCC模型中资源的提供者是其他业务服务。</p>
+<p><strong>2、<code>TCC</code>模型中，从业务服务提供的<code>try</code>、<code>confirm</code>、<code>cancel</code>接口相当于DTP模型中RM提供的<code>prepare</code>、<code>commit</code>、<code>rollback</code>接口：</strong></p>
+<ul>
+<li><code>XA</code>协议中规定了<code>DTP</code>模型中定RM需要提供<code>prepare</code>、<code>commit</code>、<code>rollback</code>接口给<code>TM</code>调用，以实现两阶段提交。</li>
+<li>而在<code>TCC</code>模型中，从业务服务相当于<code>RM</code>，提供了类似的<code>try</code>、<code>confirm</code>、<code>cancel</code>接口。</li>
+</ul>
+<p><strong>3、事务管理器</strong></p>
+<p>   <code>DTP</code>模型和<code>TCC</code>模型中都有一个事务管理器。不同的是：</p>
+<p>   在<code>DTP</code>模型中，阶段1的（<code>prepare</code>）和阶段2的（<code>commit</code>、<code>rollback</code>），都是由<code>TM</code>进行调用的。</p>
+<p>   在<code>TCC</code>模型中，阶段1的<code>try</code>接口是主业务服务调用（绿色箭头），阶段2的（<code>confirm</code>、<code>cancel</code>接口）是事务管理器TM调用(红色箭头)。</p>
+<p>这就是<code>TCC</code>分布式事务模型的二阶段异步化功能，从业务服务的第一阶段执行成功，主业务服务就可以提交完成，然后再由事务管理器框架异步的执行各从业务服务的第二阶段。</p>
+<p>这里牺牲了一定的隔离性和一致性的，但是<strong>提高了长事务的可用性</strong>。</p>
+<h3 id="可靠消息最终一致性"><a href="#可靠消息最终一致性" class="headerlink" title="可靠消息最终一致性"></a>可靠消息最终一致性</h3><ul>
+<li><p>基于<code>MQ</code>的事务消息（<code>RocketMQ</code>）：</p>
+<p><img src="http://qd2x6jysb.bkt.clouddn.com/image-20200805232003088.png" alt="image-20200805232003088"></p>
+<ol>
+<li><p>发送方向 <code>MQ</code> 服务端发送消息；</p>
+</li>
+<li><p><code>MQ Server</code> 将<strong>消息持久化</strong>成功之后，向发送方 <code>ACK</code> 确认消息已经发送成功，此时消息为<strong>半消息</strong>；</p>
+</li>
+<li><p>发送方开始执行本地事务逻辑；</p>
+</li>
+<li><p>发送方根据本地事务执行结果向 <code>MQ Server</code> 提交二次确认（<code>Commit</code> 或是 <code>Rollback</code>），<code>MQ Server</code> 收到 <code>Commit</code> 状态则将半消息标记为可投递，订阅方最终将收到该消息；</p>
+<p><code>MQ Server</code> 收到 <code>Rollback</code> 状态则删除半消息，订阅方将不会接受该消息；</p>
+</li>
+<li><p>在断网或者是应用重启的特殊情况下，上述步骤 4 提交的二次确认最终未到达 <code>MQ Server</code>，经过固定时间后 <code>MQ Server</code> 将对该消息发起消息回查；</p>
+</li>
+<li><p>发送方收到消息回查后，需要检查对应消息的本地事务执行的最终结果；</p>
+</li>
+<li><p>发送方根据检查得到的本地事务的最终状态再次提交二次确认，<code>MQ Server</code> 仍按照步骤 4 对<strong>半消息</strong>进行操作；</p>
+</li>
+</ol>
+</li>
+<li><p><strong>独立消息服务（本地事务表）</strong></p>
+<p><img src="/Users/yuezh/Library/Application%20Support/typora-user-images/image-20200805232832438.png" alt="image-20200805232832438"></p>
+<p>其实就是<strong>将消息先发送到一个我们自己编写的一个”独立消息服务”应用</strong>中，刚开始处于<code>prepare</code>状态，业务逻辑处理成功后，确认发送消息，这个时候”独立消息服务”才会真正的把消息发送给消息队列。</p>
+<p>消费者消费成功后，<code>ack</code>时，除了对消息队列进行<code>ack</code>，对于独立消息服务也要进行<code>ack</code>，”独立消息服务”一般是把这条消息删除。</p>
+<p>而定时扫描<code>prepare</code>状态的消息，向消息发送端（<code>Producer</code>）确认的工作也由独立消息服务来完成。</p>
+</li>
+</ul>
+<h3 id="最大努力通知型"><a href="#最大努力通知型" class="headerlink" title="最大努力通知型"></a>最大努力通知型</h3><p>最大努力通知型( <code>Best-effort delivery</code>)是最简单的一种柔性事务，适用于一些<strong>最终一致性时间敏感度低的业务，且被动方处理结果不影响主动方的处理结果。</strong></p>
+<p>典型的<strong>使用场景</strong>：如银行通知、商户通知等。</p>
+<p>最大努力通知型的实现方案，一般符合以下<strong>特点</strong>：</p>
+<ol>
+<li><p><strong>不可靠消息</strong>：业务活动主动方，<strong>在完成业务处理之后，向业务活动的被动方发送消息，直到通知N次后不再通知，允许消息丢失（不可靠消息）</strong>。</p>
+</li>
+<li><p><strong>定期校对</strong>：业务活动的被动方，根据定时策略，向业务活动主动方查询（主动方提供查询接口），恢复丢失的业务消息。</p>
+</li>
+</ol>
+<h2 id="分布式事务框架"><a href="#分布式事务框架" class="headerlink" title="分布式事务框架"></a>分布式事务框架</h2><h3 id="TCC-LCN"><a href="#TCC-LCN" class="headerlink" title="TCC-LCN"></a>TCC-LCN</h3><p><code>TX-LCN</code> 定位于一款事务协调性框架，框架其本身并不操作事务，而是基于对事务的协调从而达到事务一致性的效果。</p>
+<p>支持<code>3PC</code>、<code>2PC</code>；  </p>
+<p><img src="http://qd2x6jysb.bkt.clouddn.com/image-20200805141329151.png" alt="image-20200805141329151"></p>
+<p><strong>思想：</strong></p>
+<p><strong>所有参与方向<code>TransactionManager</code>汇报，由<code>TransactionManager</code>进行统一调度（提交、取消事务）。</strong></p>
+<p><strong>由两大模块组成：</strong></p>
+<ul>
+<li><code>TxClient</code>：模块的依赖框架，提供 <code>TX-LCN</code> 的标准支持；</li>
+<li><code>TxManager</code>：作为分布式事务的控制方；</li>
+</ul>
+<p><strong>步骤：</strong>（具体怎么玩自己百度哈）</p>
+<ol>
+<li><p><strong>创建事务组</strong></p>
+<p>在事务发起方开始执行业务代码之前先调用 <code>TxManager</code> 创建事务组对象，然后拿到事务标示 <code>GroupId</code> 的过程。</p>
+</li>
+<li><p><strong>加入事务组</strong> </p>
+<p>参与方在执行完业务方法以后，将该模块的事务信息通知给 <code>TxManager</code> 的操作。</p>
+</li>
+<li><p><strong>通知事务组</strong></p>
+<p>在发起方执行完业务代码以后，将发起方执行结果状态通知给 <code>TxManager</code>，<code>TxManager</code> 将根据事务最终状态和事务组的信息 来通知相应的参与模块提交或回滚事务，并返回结果给事务发起方。</p>
+</li>
+</ol>
+<h3 id="Seata"><a href="#Seata" class="headerlink" title="Seata"></a>Seata</h3><p><code>Seata</code>（<code>Simple Extensible Autonomous Transaction Architecture</code>）是 阿里巴巴开源的分布式事务中间件， 以高效并且<strong>对业务 0 侵入的方式</strong>，解决微服务场景下面临的分布式事务问题。</p>
+<p><img src="http://qd2x6jysb.bkt.clouddn.com/image-20200805231304339.png" alt="image-20200805231304339"></p>
+<ul>
+<li><p>分支事务中数据的 本地锁 由本地事务管理，在分支事务 <code>Phase1</code> 结束时释放。</p>
+</li>
+<li><p>同时，随着本地事务结束，连接也得以释放。</p>
+</li>
+<li><p>分支事务中数据的 全局锁 在事务协调器侧管理，在决议 <code>Phase2</code> 全局提交时，全局锁马上可以释放。</p>
+<p>只有在决议全局回滚的情况下，全局锁 才被持有至分支的 <code>Phase2</code> 结束。</p>
+</li>
+</ul>
+<h4 id="设计思想"><a href="#设计思想" class="headerlink" title="设计思想"></a>设计思想</h4><p><code>seata</code> 的 <code>AT</code> 模式，采用的是大量运用在数据库软件的 <code>Write Ahead Log</code> 思想，即<strong>把事务的信息以事务日志的方式记录</strong>下来。这种处理方式，实际上是<strong>对传统两阶段提交的一种改进和优化</strong>。</p>
+<p>主要有几个关键点：</p>
+<ol>
+<li><strong>传统两阶段提交协议是阻塞协议，性能差；</strong></li>
+<li><strong>传统两阶段提交协议高可用性不好；</strong></li>
+<li><strong>传统两阶段提交协议的全局事务隔离机制不支持；</strong></li>
+<li><strong>根据二八原则，80% 的涉及到全局事务的业务是能正常完成并提交的。</strong></li>
+</ol>
+<p>在 <code>AT</code> 模式下，<code>seata</code> 采取的做法是，<strong>一个事务分支的数据库操作执行完后，马上进行本地事务的提交，从而释放相关的数据库资源</strong>。</p>
+<h4 id="执行流程"><a href="#执行流程" class="headerlink" title="执行流程"></a>执行流程</h4><h5 id="本地事务"><a href="#本地事务" class="headerlink" title="本地事务"></a>本地事务</h5><p>在进行本地提交的前提是，<code>seata</code> 会解析 <code>SQL</code>，获取数据库表的元数据，根据 <code>SQL</code> 类型，选择性地生成数据的<strong>前置镜像</strong>和<strong>后置镜像</strong>，保存在 <code>undo_log</code> 表中，并且要求与保存 <code>undo_log</code> 与业务 <code>SQL</code> 在<strong>同一个本地事务内</strong>。</p>
+<p>保证了：</p>
+<ol>
+<li><p>如果一个本地事务被提交，那么必定对应着相应的 <code>undo_log</code>；</p>
+</li>
+<li><p>如果保存 <code>undo_log</code> 保存失败，那么业务 <code>SQL</code> 也会失败；</p>
+</li>
+</ol>
+<h5 id="全局事务"><a href="#全局事务" class="headerlink" title="全局事务"></a>全局事务</h5><p><img src="http://qd2x6jysb.bkt.clouddn.com/image-20200805234702494.png" alt="image-20200805234702494"></p>
+<p><strong>因为每个分支事务的本地事务都已经被提交，所以如果全局事务能够顺利进行到“提交“这一阶段，</strong>那么意味着所有事务分支的本地事务都已经被提交了，数据的<strong>一致性已经得到了保证</strong>。</p>
+<p>这个时候全局事务的提交就变得十分轻量级，就是把 <code>undo_log</code>对应的记录删掉即可，即使是当时删除失败了，也已经不会影响全局事务的最终结果，这次删不了，那就待会再删，程序删不了，没事，顶多人工删。</p>
+<p>提交：</p>
+<p><img src="http://qd2x6jysb.bkt.clouddn.com/image-20200805234823576.png" alt="image-20200805234823576"></p>
+<p>回滚：</p>
+<p><img src="http://qd2x6jysb.bkt.clouddn.com/image-20200805234902216.png" alt="image-20200805234902216"></p>
+
+      </div>
+      
+        <div class="prev-or-next">
+          <div class="post-foot-next">
+            
+              <a href="/2020/08/03/Spring%E7%9B%B8%E5%85%B3%E7%9F%A5(mian)%E8%AF%86(shi)%E7%82%B9(ti)%20/" target="_self">
+                <i class="iconfont icon-chevronleft"></i>
+                <span>PREV</span>
+              </a>
+            
+          </div>
+          <div class="post-attach">
+            <span class="post-pubtime">2020-08-05</span>
+            
+                  <span class="post-tags">
+                    <i class="iconfont icon-tags" title="标签 | tags"></i>
+                    
+                    <span class="span--tag">
+                      <a href="/tags/java/" title="查看 java 标签">
+                        <b>#</b> java
+                      </a>
+                    </span>
+                    
+                    <span class="span--tag">
+                      <a href="/tags/%E5%88%86%E5%B8%83%E5%BC%8F/" title="查看 分布式 标签">
+                        <b>#</b> 分布式
+                      </a>
+                    </span>
+                    
+                    <span class="span--tag">
+                      <a href="/tags/%E4%BA%8B%E5%8A%A1/" title="查看 事务 标签">
+                        <b>#</b> 事务
+                      </a>
+                    </span>
+                    
+                  </span>
+              
+          </div>
+          <div class="post-foot-prev">
+            
+          </div>
+        </div>
+      
+    </div>
+    
+  <div class="post-catalog" id="catalog">
+    <div class="title">目录</div>
+    <div class="catalog-content">
+      <ol class="toc"><li class="toc-item toc-level-2"><a class="toc-link" href="#分布式事务"><span class="toc-text">分布式事务</span></a><ol class="toc-child"><li class="toc-item toc-level-3"><a class="toc-link" href="#CAP理论"><span class="toc-text">CAP理论</span></a><ol class="toc-child"><li class="toc-item toc-level-4"><a class="toc-link" href="#一致性（Consistency）"><span class="toc-text">一致性（Consistency）</span></a></li><li class="toc-item toc-level-4"><a class="toc-link" href="#可用性（Availability）"><span class="toc-text">可用性（Availability）</span></a></li></ol></li><li class="toc-item toc-level-3"><a class="toc-link" href="#BASE理论"><span class="toc-text">BASE理论</span></a></li></ol></li><li class="toc-item toc-level-2"><a class="toc-link" href="#刚性事务"><span class="toc-text">刚性事务</span></a><ol class="toc-child"><li class="toc-item toc-level-3"><a class="toc-link" href="#Spring事务"><span class="toc-text">Spring事务</span></a><ol class="toc-child"><li class="toc-item toc-level-4"><a class="toc-link" href="#编程式事务"><span class="toc-text">编程式事务</span></a></li><li class="toc-item toc-level-4"><a class="toc-link" href="#声明式事务"><span class="toc-text">声明式事务</span></a></li><li class="toc-item toc-level-4"><a class="toc-link" href="#隔离级别"><span class="toc-text">隔离级别</span></a></li><li class="toc-item toc-level-4"><a class="toc-link" href="#事务传播机制"><span class="toc-text">事务传播机制</span></a></li><li class="toc-item toc-level-4"><a class="toc-link" href="#事务超时"><span class="toc-text">事务超时</span></a></li></ol></li><li class="toc-item toc-level-3"><a class="toc-link" href="#XA协议"><span class="toc-text">XA协议</span></a><ol class="toc-child"><li class="toc-item toc-level-4"><a class="toc-link" href="#DTP（Distributed-Transaction-Processing，分布式事务处理，简称DTP）模型元素"><span class="toc-text">DTP（Distributed Transaction Processing，分布式事务处理，简称DTP）模型元素</span></a></li></ol></li><li class="toc-item toc-level-3"><a class="toc-link" href="#2PC"><span class="toc-text">2PC</span></a><ol class="toc-child"><li class="toc-item toc-level-4"><a class="toc-link" href="#XA对2PC的优化"><span class="toc-text">XA对2PC的优化</span></a></li><li class="toc-item toc-level-4"><a class="toc-link" href="#优点"><span class="toc-text">优点</span></a></li><li class="toc-item toc-level-4"><a class="toc-link" href="#存在的问题"><span class="toc-text">存在的问题</span></a></li></ol></li><li class="toc-item toc-level-3"><a class="toc-link" href="#3PC"><span class="toc-text">3PC</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#2PC与3PC区别"><span class="toc-text">2PC与3PC区别</span></a></li></ol></li><li class="toc-item toc-level-2"><a class="toc-link" href="#柔性事务（软事务）"><span class="toc-text">柔性事务（软事务）</span></a><ol class="toc-child"><li class="toc-item toc-level-3"><a class="toc-link" href="#TCC（Try-Confirm-Cancel）"><span class="toc-text">TCC（Try-Confirm-Cancel）</span></a><ol class="toc-child"><li class="toc-item toc-level-4"><a class="toc-link" href="#优点-1"><span class="toc-text">优点</span></a></li><li class="toc-item toc-level-4"><a class="toc-link" href="#缺点"><span class="toc-text">缺点</span></a></li><li class="toc-item toc-level-4"><a class="toc-link" href="#TCC与XA事务区别"><span class="toc-text">TCC与XA事务区别</span></a></li><li class="toc-item toc-level-4"><a class="toc-link" href="#TCC模型与DTP模型异同"><span class="toc-text">TCC模型与DTP模型异同</span></a></li></ol></li><li class="toc-item toc-level-3"><a class="toc-link" href="#可靠消息最终一致性"><span class="toc-text">可靠消息最终一致性</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#最大努力通知型"><span class="toc-text">最大努力通知型</span></a></li></ol></li><li class="toc-item toc-level-2"><a class="toc-link" href="#分布式事务框架"><span class="toc-text">分布式事务框架</span></a><ol class="toc-child"><li class="toc-item toc-level-3"><a class="toc-link" href="#TCC-LCN"><span class="toc-text">TCC-LCN</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#Seata"><span class="toc-text">Seata</span></a><ol class="toc-child"><li class="toc-item toc-level-4"><a class="toc-link" href="#设计思想"><span class="toc-text">设计思想</span></a></li><li class="toc-item toc-level-4"><a class="toc-link" href="#执行流程"><span class="toc-text">执行流程</span></a><ol class="toc-child"><li class="toc-item toc-level-5"><a class="toc-link" href="#本地事务"><span class="toc-text">本地事务</span></a></li><li class="toc-item toc-level-5"><a class="toc-link" href="#全局事务"><span class="toc-text">全局事务</span></a></li></ol></li></ol></li></ol></li></ol>
+    </div>
+  </div>
+
+  
+<script src="/js/catalog.js"></script>
+
+
+
+
+    
+      <div class="comments-container">
+        
+
+
+  <script src='//unpkg.com/valine/dist/Valine.min.js'></script>
+
+  <div id="vcomments"></div>
+
+  <script>
+    new Valine({
+      el: '#vcomments',
+      appId: 'bSYdbCIyQHwCwv9NC9Fes7mU-gzGzoHsz',
+      appKey: 'zuj9HNh3w0O1O5t1nR1yeNHD',
+      placeholder: '说出你的想法...',
+      avatar: 'retro'
+    })
+  </script>
+
+    <style>
+      .comments-container .v .vempty {
+        display: none!important;
+      }
+    </style>
+
+
+
+
+      </div>
+    
+  </div>
+
+  
+        <div class="footer">
+  <div class="social">
+    <ul>
+      
+        <li>
+          <a title="github" href="https://github.com/YYZ-coder" target="_blank" rel="noopener">
+            <i class="iconfont icon-github"></i>
+          </a>
+        </li>
+      
+        <li>
+          <a title="rss" href="/atom.xml">
+            <i class="iconfont icon-rss"></i>
+          </a>
+        </li>
+      
+    </ul>
+  </div>
+  
+    <div class="footer-more">
+      <a href="">Copyright © YYZ-coder 2020</a>
+    </div>
+  
+    <div class="footer-more">
+      <a href="https://github.com/zchengsite/hexo-theme-oranges" target="_blank" rel="noopener">Theme by Oranges | Powered by Hexo</a>
+    </div>
+  
+</div>
+
+      </div>
+
+      <div class="back-to-top hidden">
+  <a href="javascript: void(0)">
+    <i class="iconfont icon-chevronup"></i>
+  </a>
+</div>
+
+
+<script src="/js/backtotop.js"></script>
+
+
+
+    </div>
+  </body>
+</html>
