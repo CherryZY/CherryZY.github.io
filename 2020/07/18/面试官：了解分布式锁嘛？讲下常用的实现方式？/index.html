@@ -148,7 +148,7 @@
 <h3 id="RedLock（redisson）"><a href="#RedLock（redisson）" class="headerlink" title="RedLock（redisson）"></a>RedLock（redisson）</h3><blockquote>
 <p>引用：<a href="https://mp.weixin.qq.com/s/y_Uw3P2Ll7wvk_j5Fdlusw" target="_blank" rel="noopener">https://mp.weixin.qq.com/s/y_Uw3P2Ll7wvk_j5Fdlusw</a></p>
 </blockquote>
-<p><img src="http://qd2x6jysb.bkt.clouddn.com/image-20200710111524760.png" alt="image-20200710111524760"></p>
+<p><img src="http://ali-md-pic.oss-cn-shenzhen.aliyuncs.com/md-pic-box/image-20200710111524760.png" alt="image-20200710111524760"></p>
 <p>如果客户端长期阻塞导致锁过期，那么它接下来访问共享资源就不安全了（没有了锁的保护）。显然，这样的问题在Redlock中是依然存在的。</p>
 <p><strong>（1）加锁机制</strong></p>
 <p><strong>（2）锁互斥机制</strong></p>
@@ -239,13 +239,13 @@
 <li>另外一种是自己传入<code>TTL</code>，这种<code>redisson</code>就不会帮我们自动续期了，或者自己将<code>leaseTime</code>的值传成<code>-1</code>；</li>
 </ul>
 <p><strong>Martin Kleppmann</strong>提出问题：</p>
-<p><img src="http://qd2x6jysb.bkt.clouddn.com/image-20200710133901031.png" alt="image-20200710133901031"></p>
+<p><img src="http://ali-md-pic.oss-cn-shenzhen.aliyuncs.com/md-pic-box/image-20200710133901031.png" alt="image-20200710133901031"></p>
 <h6 id="解决方案-1"><a href="#解决方案-1" class="headerlink" title="解决方案"></a>解决方案</h6><ol>
 <li><p><strong>不设置TTL，而是在获取锁成功后，给锁加一个<code>watchdog</code></strong>，<code>watchdog</code>会起一个定时任务，在锁没有被释放且快要过期的时候会续期。</p>
 <p>不过这种做法也无法百分百做到同一时刻只有一个client获取到锁，如果续期失败，比如发生了<strong>Martin Kleppmann</strong>所说的STW的GC，或者client和redis集群失联了，只要续期失败，就会造成同一时刻有多个client获得锁了。</p>
 </li>
 <li><p><strong>在客户端获取锁的同时，也获取到一个资源的token，这个token是单调递增的</strong>，每次在写资源时，都检查当前的token是否是较老的token，如果是就不让写。（Martin的解决方法）</p>
-<p><img src="http://qd2x6jysb.bkt.clouddn.com/image-20200710134245283.png" alt="image-20200710134245283"></p>
+<p><img src="http://ali-md-pic.oss-cn-shenzhen.aliyuncs.com/md-pic-box/image-20200710134245283.png" alt="image-20200710134245283"></p>
 <p>对于上面的场景，<code>Client1</code>获取锁的同时分配一个<code>33的token</code>，<code>Client2</code>获取锁的时候分配一个<code>34的token</code>，在<code>client1 GC</code>期间，<code>Client2</code>已经写了资源，这时<code>最大的token就是34</code>了，client1 从GC中回来，再带着33的token写资源时，会因为token过期被拒绝。这种做法<strong>需要资源那一边提供一个token生成器。</strong></p>
 <p><strong>该方案问题</strong>：</p>
 <ol>

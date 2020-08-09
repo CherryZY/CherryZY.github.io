@@ -128,7 +128,7 @@
 <p>在这种环境中，我们之前说过数据库的 <code>ACID</code> 四大特性，已经无法满足我们分布式事务。</p>
 <p><strong>本质上来说，分布式事务就是为了保证不同数据库的数据一致性。</strong></p>
 <p>比如如下业务图：</p>
-<p><img src="http://qd2x6jysb.bkt.clouddn.com/image-20200805193919210.png" alt="image-20200805193919210"></p>
+<p><img src="http://ali-md-pic.oss-cn-shenzhen.aliyuncs.com/md-pic-box/image-20200805193919210.png" alt="image-20200805193919210"></p>
 <h3 id="CAP理论"><a href="#CAP理论" class="headerlink" title="CAP理论"></a>CAP理论</h3><p>又被叫作布鲁尔定理。</p>
 <p><code>CAP</code> 指的是：<strong>一致性（<code>Consistency</code>）、可用性（<code>Availability</code>）、分区容错性（<code>Partition tolerance</code>）</strong>。</p>
 <p><code>CAP</code> 定律说的是，<strong>在一个分布式系统中，最多只能满足 C、A、P 中的两个，不可能三个同时满足。</strong></p>
@@ -137,7 +137,7 @@
 <p>而且，显然，任何横向扩展策略都要依赖于数据分区。因此，设计人员必须在一致性与可用性之间做出选择。</p>
 <h4 id="一致性（Consistency）"><a href="#一致性（Consistency）" class="headerlink" title="一致性（Consistency）"></a>一致性（<code>Consistency</code>）</h4><blockquote>
 <p>引自：《从Paxos到Zookeeper分布式一致性原理与实践》</p>
-<p><img src="http://qd2x6jysb.bkt.clouddn.com/image-20200805194731623.png" alt="image-20200805194731623"></p>
+<p><img src="http://ali-md-pic.oss-cn-shenzhen.aliyuncs.com/md-pic-box/image-20200805194731623.png" alt="image-20200805194731623"></p>
 </blockquote>
 <h4 id="可用性（Availability）"><a href="#可用性（Availability）" class="headerlink" title="可用性（Availability）"></a>可用性（<code>Availability</code>）</h4><p>可用性指系统提供的服务必须一直处于可用状态，对于用户每一个操作请求总是能够在<strong>有限时间</strong>内<strong>返回结果</strong>。</p>
 <blockquote>
@@ -151,7 +151,7 @@
 </li>
 </ul>
 </blockquote>
-<p><img src="http://qd2x6jysb.bkt.clouddn.com/image-20200805195823749.png" alt="image-20200805195823749"></p>
+<p><img src="http://ali-md-pic.oss-cn-shenzhen.aliyuncs.com/md-pic-box/image-20200805195823749.png" alt="image-20200805195823749"></p>
 <h3 id="BASE理论"><a href="#BASE理论" class="headerlink" title="BASE理论"></a>BASE理论</h3><p>往往在分布式系统中无法实现完全一致性，于是有了 BASE 理论，它是对 CAP 定律的进一步扩充。</p>
 <p><strong>BASE</strong> 指的是：</p>
 <ul>
@@ -230,7 +230,7 @@
 <td>如果外层有事务，则当前事务加入到外层事务，一块提交，一块回滚。如果外层没有事务，新建一个事务执行。</td>
 </tr>
 <tr>
-<td><code>PROPAGATION_REQUES_NEW</code></td>
+<td><code>PROPAGATION_REQUIRES_NEW</code></td>
 <td>该事务传播机制是每次都会新开启一个事务，同时把外层事务挂起，当当前事务执行完毕，恢复上层事务的执行。如果外层没有事务，执行当前新开启的事务即可。</td>
 </tr>
 <tr>
@@ -247,7 +247,7 @@
 </tr>
 <tr>
 <td><code>PROPAGATION_MANDATORY</code></td>
-<td>与NEVER相反，如果外层没有事务，则抛出异常。</td>
+<td>与<code>NEVER</code>相反，如果外层没有事务，则抛出异常。</td>
 </tr>
 <tr>
 <td><code>PROPAGATION_NESTED</code></td>
@@ -270,10 +270,10 @@
 <li><strong>通信协议（Communication Protocol，简称CP）：</strong>提供CRM提供的分布式应用节点之间的底层通信服务。</li>
 </ul>
 <p>一个<code>DTP</code>模型实例至少由三个组成部分：<code>AP(Application)</code>，<code>RMs(Resource Manager)</code>，<code>TM(Transaction Manager)</code>：</p>
-<p><img src="http://qd2x6jysb.bkt.clouddn.com/image-20200805221833232.png" alt="image-20200805221833232"></p>
+<p><img src="http://ali-md-pic.oss-cn-shenzhen.aliyuncs.com/md-pic-box/image-20200805221833232.png" alt="image-20200805221833232"></p>
 <h3 id="2PC"><a href="#2PC" class="headerlink" title="2PC"></a>2PC</h3><p><strong>XA协议对其进行了优化。</strong></p>
 <p><code>2PC</code>，将事务的提交过程分为：<strong>准备阶段、提交阶段</strong>。</p>
-<p><img src="http://qd2x6jysb.bkt.clouddn.com/image-20200805134737350.png" width="45%"/><img src="http://qd2x6jysb.bkt.clouddn.com/image-20200805134748857.png" width="45%"/></p>
+<p><img src="http://ali-md-pic.oss-cn-shenzhen.aliyuncs.com/md-pic-box/image-20200805134737350.png" width="45%"/><img src="http://ali-md-pic.oss-cn-shenzhen.aliyuncs.com/md-pic-box/image-20200805134748857.png" width="45%"/></p>
 <p>事务的发起者称协调者，事务的执行者称参与者。</p>
 <ul>
 <li><p><strong>阶段1：准备阶段</strong></p>
@@ -298,8 +298,8 @@
 <h4 id="XA对2PC的优化"><a href="#XA对2PC的优化" class="headerlink" title="XA对2PC的优化"></a>XA对2PC的优化</h4><ul>
 <li><strong>只读断言</strong></li>
 </ul>
-<p>在<code>Phase 1</code>中，<code>RM</code>可以断言“我这边不涉及数据增删改”来答复<code>TM</code>的<code>prepare</code>请求，从而让这个<code>RM</code>脱离当前的全局事务，从而免去了<code>Phase 2</code>。</p>
-<p>这种优化发生在其他<code>RM</code>都完成<code>prepare</code>之前的话，使用了只读断言的RM早于AP其他动作（比如说这个RM返回那些只读数据给AP）前，就释放了相关数据的上下文（比如读锁之类的），这时候其他全局事务或者本地事务就有机会去改变这些数据，结果就是无法保障整个系统的可序列化特性 —— 通俗点说那就会有脏读的风险。</p>
+<p>在<code>Phase 1</code>中，<code>RM</code>可以断言“<strong>我这边不涉及数据增删改</strong>”来答复<code>TM</code>的<code>prepare</code>请求，从而让这个<code>RM</code>脱离当前的全局事务，从而免去了<code>Phase 2</code>。</p>
+<p>这种优化发生在其他<code>RM</code>都完成<code>prepare</code>之前的话，使用了只读断言的<code>RM</code>早于<code>AP</code>其他动作（比如说这个<code>RM</code>返回那些只读数据给<code>AP</code>）前，就释放了相关数据的上下文（比如读锁之类的），这时候其他全局事务或者本地事务就有机会去改变这些数据，结果就是无法保障整个系统的可序列化特性 —— 通俗点说那就会有脏读的风险。</p>
 <ul>
 <li><strong>一阶段提交</strong></li>
 </ul>
@@ -344,7 +344,7 @@
 </li>
 </ol>
 <p>将 2PC 的 “提交事务请求” 过程一分为二。</p>
-<img src="http://qd2x6jysb.bkt.clouddn.com/image-20200805135809707.png" height="30%" width="50%"/>
+<img src="http://ali-md-pic.oss-cn-shenzhen.aliyuncs.com/md-pic-box/image-20200805135809707.png" height="30%" width="50%"/>
 
 <p>3PC，三阶段提交协议，是2PC的改进版本，</p>
 <p>即将事务的提交过程分为<strong>CanCommit、PreCommit、do Commit</strong>三个阶段来进行处理。</p>
@@ -362,14 +362,15 @@
 <p>2、任何一个参与者反馈<code>NO</code>，或者等待超时后协调者尚无法收到所有参与者的反馈，即中断事务。</p>
 </li>
 </ul>
-<h3 id="2PC与3PC区别"><a href="#2PC与3PC区别" class="headerlink" title="2PC与3PC区别"></a>2PC与3PC区别</h3><p>相对于<code>2PC</code>，<code>3PC</code>主要解决的<strong>单点故障问题</strong>，并<strong>减少阻塞</strong>，因为一旦参与者无法及时收到来自协调者的信息之后，他会默认执行<code>commit</code>。而不会一直持有事务资源并处于阻塞状态。但是这种机制也会<strong>导致数据一致性问题</strong>，因为，由于网络原因，协调者发送的<code>abort</code>响应没有及时被参与者接收到，那么参与者在等待超时之后执行了<code>commit</code>操作。这样就和其他接到<code>abort</code>命令并执行回滚的参与者之间存在数据不一致的情况。</p>
+<h3 id="2PC与3PC区别"><a href="#2PC与3PC区别" class="headerlink" title="2PC与3PC区别"></a>2PC与3PC区别</h3><p>相对于<code>2PC</code>，<code>3PC</code>主要解决的<strong>单点故障问题</strong>，并<strong>减少阻塞</strong>，因为一旦参与者无法及时收到来自协调者的信息之后，他会默认执行<code>commit</code>。</p>
+<p>而不会一直持有事务资源并处于阻塞状态。但是这种机制也会<strong>导致数据一致性问题</strong>，因为，由于网络原因，协调者发送的<code>abort</code>响应没有及时被参与者接收到，那么参与者在等待超时之后执行了<code>commit</code>操作。这样就和其他接到<code>abort</code>命令并执行回滚的参与者之间存在数据不一致的情况。</p>
 <h2 id="柔性事务（软事务）"><a href="#柔性事务（软事务）" class="headerlink" title="柔性事务（软事务）"></a>柔性事务（软事务）</h2><p>==仅保证最终一致性。==</p>
 <ul>
-<li><p><strong>BA</strong>:Basic Availability 基本业务可用性</p>
+<li><p><strong>BA</strong>：<code>Basic Availability</code> 基本业务可用性</p>
 </li>
-<li><p><strong>S</strong>：Soft state 柔性状态（中间态不一致）</p>
+<li><p><strong>S</strong>：<code>Soft state</code> 柔性状态（中间态不一致）</p>
 </li>
-<li><p><strong>E</strong> : Eventual consistency 最终一致性</p>
+<li><p><strong>E</strong> : <code>Eventual consistency</code> 最终一致性</p>
 </li>
 </ul>
 <p><strong>为了可用性，牺牲一致性</strong></p>
@@ -389,7 +390,7 @@
 </ul>
 <p>取消Try阶段预留的业务资源。</p>
 <p>开源方案：<code>tcc-transaction</code>、<code>ByteTCC</code>、<code>spring-cloud-rest-tcc</code>。</p>
-<p><img src="http://qd2x6jysb.bkt.clouddn.com/image-20200805225607753.png" alt="image-20200805225607753"></p>
+<p><img src="http://ali-md-pic.oss-cn-shenzhen.aliyuncs.com/md-pic-box/image-20200805225607753.png" alt="image-20200805225607753"></p>
 <h4 id="优点-1"><a href="#优点-1" class="headerlink" title="优点"></a>优点</h4><p><code>XA两阶段提交</code><strong>资源层面</strong>的，而<code>TCC</code>实际上把资源层面二阶段提交上提到了业务层面来实现。</p>
 <p>有效了的避免了<code>XA两阶段</code>提交<strong>占用资源锁时间过长导致的性能低下</strong>问题。</p>
 <h4 id="缺点"><a href="#缺点" class="headerlink" title="缺点"></a>缺点</h4><p>主业务服务和从业务服务都需要进行改造，从业务方改造成本更高。</p>
@@ -409,7 +410,7 @@
 </ol>
 </li>
 </ul>
-<h4 id="TCC模型与DTP模型异同"><a href="#TCC模型与DTP模型异同" class="headerlink" title="TCC模型与DTP模型异同"></a>TCC模型与DTP模型异同</h4><p><img src="http://qd2x6jysb.bkt.clouddn.com/image-20200805230747546.png" alt="image-20200805230747546"></p>
+<h4 id="TCC模型与DTP模型异同"><a href="#TCC模型与DTP模型异同" class="headerlink" title="TCC模型与DTP模型异同"></a>TCC模型与DTP模型异同</h4><p><img src="http://ali-md-pic.oss-cn-shenzhen.aliyuncs.com/md-pic-box/image-20200805230747546.png" alt="image-20200805230747546"></p>
 <p><strong>1、<code>TCC</code>模型中的主业务服务相当于<code>DTP</code>模型中的<code>AP</code>，<code>TCC</code>模型中的从业务服务相当于 <code>DTP</code>模型中的<code>RM</code></strong></p>
 <p>在<code>DTP</code>模型中，应用AP操作多个资源管理器<code>RM</code>上的资源；</p>
 <p>而在<code>TCC</code>模型中，是主业务服务操作多个从业务服务上的资源。</p>
@@ -427,7 +428,7 @@
 <p>这里牺牲了一定的隔离性和一致性的，但是<strong>提高了长事务的可用性</strong>。</p>
 <h3 id="可靠消息最终一致性"><a href="#可靠消息最终一致性" class="headerlink" title="可靠消息最终一致性"></a>可靠消息最终一致性</h3><ul>
 <li><p>基于<code>MQ</code>的事务消息（<code>RocketMQ</code>）：</p>
-<p><img src="http://qd2x6jysb.bkt.clouddn.com/image-20200805232003088.png" alt="image-20200805232003088"></p>
+<p><img src="http://ali-md-pic.oss-cn-shenzhen.aliyuncs.com/md-pic-box/image-20200805232003088.png" alt="image-20200805232003088"></p>
 <ol>
 <li><p>发送方向 <code>MQ</code> 服务端发送消息；</p>
 </li>
@@ -464,7 +465,7 @@
 </ol>
 <h2 id="分布式事务框架"><a href="#分布式事务框架" class="headerlink" title="分布式事务框架"></a>分布式事务框架</h2><h3 id="TCC-LCN"><a href="#TCC-LCN" class="headerlink" title="TCC-LCN"></a>TCC-LCN</h3><p><code>TX-LCN</code> 定位于一款事务协调性框架，框架其本身并不操作事务，而是基于对事务的协调从而达到事务一致性的效果。</p>
 <p>支持<code>3PC</code>、<code>2PC</code>；  </p>
-<p><img src="http://qd2x6jysb.bkt.clouddn.com/image-20200805141329151.png" alt="image-20200805141329151"></p>
+<p><img src="http://ali-md-pic.oss-cn-shenzhen.aliyuncs.com/md-pic-box/image-20200805141329151.png" alt="image-20200805141329151"></p>
 <p><strong>思想：</strong></p>
 <p><strong>所有参与方向<code>TransactionManager</code>汇报，由<code>TransactionManager</code>进行统一调度（提交、取消事务）。</strong></p>
 <p><strong>由两大模块组成：</strong></p>
@@ -485,7 +486,7 @@
 </li>
 </ol>
 <h3 id="Seata"><a href="#Seata" class="headerlink" title="Seata"></a>Seata</h3><p><code>Seata</code>（<code>Simple Extensible Autonomous Transaction Architecture</code>）是 阿里巴巴开源的分布式事务中间件， 以高效并且<strong>对业务 0 侵入的方式</strong>，解决微服务场景下面临的分布式事务问题。</p>
-<p><img src="http://qd2x6jysb.bkt.clouddn.com/image-20200805231304339.png" alt="image-20200805231304339"></p>
+<p><img src="http://ali-md-pic.oss-cn-shenzhen.aliyuncs.com/md-pic-box/image-20200805231304339.png" alt="image-20200805231304339"></p>
 <ul>
 <li><p>分支事务中数据的 本地锁 由本地事务管理，在分支事务 <code>Phase1</code> 结束时释放。</p>
 </li>
@@ -512,13 +513,13 @@
 <li><p>如果保存 <code>undo_log</code> 保存失败，那么业务 <code>SQL</code> 也会失败；</p>
 </li>
 </ol>
-<h5 id="全局事务"><a href="#全局事务" class="headerlink" title="全局事务"></a>全局事务</h5><p><img src="http://qd2x6jysb.bkt.clouddn.com/image-20200805234702494.png" alt="image-20200805234702494"></p>
+<h5 id="全局事务"><a href="#全局事务" class="headerlink" title="全局事务"></a>全局事务</h5><p><img src="http://ali-md-pic.oss-cn-shenzhen.aliyuncs.com/md-pic-box/image-20200805234702494.png" alt="image-20200805234702494"></p>
 <p><strong>因为每个分支事务的本地事务都已经被提交，所以如果全局事务能够顺利进行到“提交“这一阶段，</strong>那么意味着所有事务分支的本地事务都已经被提交了，数据的<strong>一致性已经得到了保证</strong>。</p>
 <p>这个时候全局事务的提交就变得十分轻量级，就是把 <code>undo_log</code>对应的记录删掉即可，即使是当时删除失败了，也已经不会影响全局事务的最终结果，这次删不了，那就待会再删，程序删不了，没事，顶多人工删。</p>
 <p>提交：</p>
-<p><img src="http://qd2x6jysb.bkt.clouddn.com/image-20200805234823576.png" alt="image-20200805234823576"></p>
+<p><img src="http://ali-md-pic.oss-cn-shenzhen.aliyuncs.com/md-pic-box/image-20200805234823576.png" alt="image-20200805234823576"></p>
 <p>回滚：</p>
-<p><img src="http://qd2x6jysb.bkt.clouddn.com/image-20200805234902216.png" alt="image-20200805234902216"></p>
+<p><img src="http://ali-md-pic.oss-cn-shenzhen.aliyuncs.com/md-pic-box/image-20200805234902216.png" alt="image-20200805234902216"></p>
 
       </div>
       

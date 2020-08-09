@@ -143,8 +143,8 @@
 
 
 <h2 id="使用场景"><a href="#使用场景" class="headerlink" title="使用场景"></a>使用场景</h2><p>GC过程短暂停，适合对时延要求较高的服务，用户线程不允许长时间的停顿。</p>
-<h2 id="收集过程"><a href="#收集过程" class="headerlink" title="收集过程"></a>收集过程</h2><p><img src="http://qd2x6jysb.bkt.clouddn.com/image-20200728010409132.png" alt="image-20200728010409132"></p>
-<h3 id="初始标记（STW-InitialMarking）"><a href="#初始标记（STW-InitialMarking）" class="headerlink" title="初始标记（STW, InitialMarking）"></a>初始标记（STW, InitialMarking）</h3><p><img src="http://qd2x6jysb.bkt.clouddn.com/image-20200729172826293.png" alt="image-20200729172826293"></p>
+<h2 id="收集过程"><a href="#收集过程" class="headerlink" title="收集过程"></a>收集过程</h2><p><img src="http://ali-md-pic.oss-cn-shenzhen.aliyuncs.com/md-pic-box/image-20200728010409132.png" alt="image-20200728010409132"></p>
+<h3 id="初始标记（STW-InitialMarking）"><a href="#初始标记（STW-InitialMarking）" class="headerlink" title="初始标记（STW, InitialMarking）"></a>初始标记（STW, InitialMarking）</h3><p><img src="http://ali-md-pic.oss-cn-shenzhen.aliyuncs.com/md-pic-box/image-20200729172826293.png" alt="image-20200729172826293"></p>
 <ul>
 <li>标记一下<code>GC Root</code>能直接关联到的对象；</li>
 <li>遍历新生代对象，标记可达的老年代对象；</li>
@@ -153,7 +153,7 @@
 <p>引自：<a href="http://citeseerx.ist.psu.edu/viewdoc/download;jsessionid=708077E17B9BF4DEB8C8A850D34C8D60?doi=10.1.1.22.8915&rep=rep1&type=pdf" target="_blank" rel="noopener">A Generational Mostly-concurrent Gabage Collector</a></p>
 <p>Initial  marking  pause.Suspend all mutators and record all ob-jects directly reachable from the roots ( globals, stacks, registers) of the system.</p>
 </blockquote>
-<h3 id="并发标记（Concurrent-Marking）"><a href="#并发标记（Concurrent-Marking）" class="headerlink" title="并发标记（Concurrent Marking）"></a>并发标记（Concurrent Marking）</h3><p><img src="http://qd2x6jysb.bkt.clouddn.com/image-20200729172839191.png" alt="image-20200729172839191"></p>
+<h3 id="并发标记（Concurrent-Marking）"><a href="#并发标记（Concurrent-Marking）" class="headerlink" title="并发标记（Concurrent Marking）"></a>并发标记（Concurrent Marking）</h3><p><img src="http://ali-md-pic.oss-cn-shenzhen.aliyuncs.com/md-pic-box/image-20200729172839191.png" alt="image-20200729172839191"></p>
 <p>是<strong>主要标记过程</strong>，这个标记过程是和用户线程并发执行的。</p>
 <ul>
 <li>遍历<code>InitialMarking</code>阶段标记出来的存活对象，然后继续递归标记这些对象可达的对象；</li>
@@ -201,13 +201,13 @@
 <p>译文：</p>
 <p>​    这又是一个并发阶段，与应用程序线程并行运行，而不是停止它们。 当上一阶段与应用程序同时运行时，某些引用已更改。 每当发生这种情况时，<code>JVM</code>会将包含<code>mutated objects</code>的堆区域（称为“<code>card</code>”）标记为“<code>dirty</code>”。</p>
 </blockquote>
-<p><img src="http://qd2x6jysb.bkt.clouddn.com/image-20200729180513498.png" alt="image-20200729180513498"></p>
+<p><img src="http://ali-md-pic.oss-cn-shenzhen.aliyuncs.com/md-pic-box/image-20200729180513498.png" alt="image-20200729180513498"></p>
 <blockquote>
 <p>​    In the pre-cleaning phase, these dirty objects are accounted for, and the objects reachable from them are also marked. The cards are cleaned when this is done.</p>
 <p>译文：</p>
 <p>​    在<code>Preclean</code>阶段，应对这些<code>dirty</code>对象进行处理，并标出从它们可触及的对象。 完成后，将清理card。</p>
 </blockquote>
-<p><img src="http://qd2x6jysb.bkt.clouddn.com/image-20200729180733788.png" alt="image-20200729180733788"></p>
+<p><img src="http://ali-md-pic.oss-cn-shenzhen.aliyuncs.com/md-pic-box/image-20200729180733788.png" alt="image-20200729180733788"></p>
 <blockquote>
 <p>引自：<a href="http://citeseerx.ist.psu.edu/viewdoc/download;jsessionid=708077E17B9BF4DEB8C8A850D34C8D60?doi=10.1.1.22.8915&rep=rep1&type=pdf" target="_blank" rel="noopener">A Generational Mostly-concurrent Gabage Collector</a></p>
 <p><strong>Concurrent  sweeping  phase.</strong></p>
@@ -319,7 +319,7 @@
 </ul>
 <p>Hosking, Moss, and Stefanovic [17] present a detailed discussion of the trade-offs between software and page-protection-based barrier implementations.Their basic conclusion is that software mechanisms are more efficient thanthose using virtual memory protection.</p>
 <p>​    In fairness, we should note that the system of Boehmet al.was attempting to satisfy a further constraint not present in our system: accomplishing garbage collection for uncooperative languages (C and C++) without compiler support. This constraint led to the conservative collection scheme [7]on which the mostly-concurrent extension is based, and also favored theuse of the virtual-memory technique for reference update tracking, since this technique required no modification of the mutator code.  We should also note that their system was also generational, albeit in a rather different manner than ours, as described in [9]. This generational mark-sweep system gets some of the benefits of “traditional” generational systems with physically segregated generations. However, we believe that the latter aremore straightforward and probably more efficient. In particular, the copyingyoung generation used in the default configuration of our system providessignificantly more efficient allocation [3].</p>
-<p><img src="http://qd2x6jysb.bkt.clouddn.com/image-20200804033617346.png" alt="image-20200804033617346"></p>
+<p><img src="http://ali-md-pic.oss-cn-shenzhen.aliyuncs.com/md-pic-box/image-20200804033617346.png" alt="image-20200804033617346"></p>
 <p>​    Adapting the card table for the needs of the generational mostly-concurrent algorithm was straight forward. In fact, as discussed above, the write barrier and card table data structure were left unchanged. However, we took careful note of the fact that the card table is used in subtly different ways by two garbage collection algorithms that may be running simultaneously. The mostly-concurrent algorithm requires tracking of all references updated sincethe beginning of the current marking phase. Young-generation collection requires identification of all old-to-young pointers. In the base generational system, a young-generation collection scans all dirty old-space cards, search-ing for pointers into the young generation. If none are found, there is noneed to scan this card in the next collection, so the card is marked asclean.Before a young-generation collection cleans a dirty card, the information that the card has been modified must be recorded for the mostly-concurrent collector.</p>
 <p>​    This is accomplished by adding a new data structure, themod uniontable, shown in Figure 2, which is so-named because it represents the unionof the sets of cards modified between each of the young-generation collections that occur during concurrent marking. The card table itself contains a byte per card in the ResearchVM; this allows a fast write-barrier implementation using a byte store. The mod-union table, on the other hand, is a bit vectorwith one bit per card. It therefore adds little space overhead beyond the card table, and also enables fast traversal to find modified cards when the table is sparsely populated. We maintain an invariant on the mod union and card tables: any card containing a reference modified since the beginning of the current concurrent marking phase either has its bit set in the mod union table, or is marked dirty in the card table, or both. This invariant is maintained by young-generation collections, which set the mod union bits for all cards dirty in the card table before scanning those dirty cards.</p>
 <p>重要译文：</p>

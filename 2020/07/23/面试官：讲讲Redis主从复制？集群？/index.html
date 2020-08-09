@@ -121,7 +121,7 @@
         <blockquote>
 <p>2020-07-23，每日问题：讲讲Redis主从复制？</p>
 </blockquote>
-<p>​                                                                    <img src="http://qd2x6jysb.bkt.clouddn.com/image-20200708032855726.png" alt="image-20200708032855726">        </p>
+<p>​                                                                    <img src="http://ali-md-pic.oss-cn-shenzhen.aliyuncs.com/md-pic-box/image-20200708032855726.png" alt="image-20200708032855726">        </p>
 <p><strong>主从复制</strong>，是指将一台 Redis 服务器的数据，复制到其他的 Redis 服务器。</p>
 <p>前者称为 <strong>主节点(master)</strong>，后者称为 <strong>从节点(slave)</strong>。且数据的复制是 <strong>单向</strong>（主节点 =&gt; 从节点） 的，只能由<strong>主节点到从节点</strong>。</p>
 <p>Redis 主从复制支持 <strong>主从同步</strong> 和 <strong>从从同步</strong> 两种，后者是 Redis 后续版本新增的功能，以减轻主节点的同步负担。（仅能从节点发起：<code>slaveof 127.0.0.1 8080</code>）</p>
@@ -131,9 +131,9 @@
 <li><strong>负载均衡：</strong> 在主从复制的基础上，配合读写分离，可以由主节点提供写服务，由从节点提供读服务 <em>（即写 Redis 数据时应用连接主节点，读 Redis 数据时应用连接从节点）</em>，分担服务器负载。尤其是在写少读多的场景下，通过多个从节点分担读负载，可以大大提高 Redis 服务器的并发量。</li>
 <li><strong>高可用基石：</strong> 除了上述作用以外，主从复制还是哨兵和集群能够实施的 <strong>基础</strong>，因此说主从复制是 Redis 高可用的基础。</li>
 </ul>
-<h2 id="原理"><a href="#原理" class="headerlink" title="原理"></a>原理</h2><p><img src="http://qd2x6jysb.bkt.clouddn.com/image-20200708032635442.png" alt="image-20200708032635442"></p>
+<h2 id="原理"><a href="#原理" class="headerlink" title="原理"></a>原理</h2><p><img src="http://ali-md-pic.oss-cn-shenzhen.aliyuncs.com/md-pic-box/image-20200708032635442.png" alt="image-20200708032635442"></p>
 <p><strong>三个阶段：准备阶段 =&gt; 数据同步阶段 =&gt; 命令传播阶段</strong>。</p>
-<p><img src="http://qd2x6jysb.bkt.clouddn.com/image-20200709155424603.png" alt="image-20200709155424603"></p>
+<p><img src="http://ali-md-pic.oss-cn-shenzhen.aliyuncs.com/md-pic-box/image-20200709155424603.png" alt="image-20200709155424603"></p>
 <ul>
 <li><p><strong>建立套接字连接</strong></p>
 <p>从服务器根据设置的套接字创建连向主服务器的套接字连接，主服务器接收从服务器的套接字连接之后，为该套接字创建响应的客户端状态，并将此时的从服务器看做是主服务器的客户端，也就是该从服务器同时具备服务器与客户端两个身份。</p>
@@ -179,7 +179,7 @@
 </ul>
 </li>
 </ul>
-<h2 id="执行SYNC命令"><a href="#执行SYNC命令" class="headerlink" title="执行SYNC命令"></a>执行SYNC命令</h2><p><img src="http://qd2x6jysb.bkt.clouddn.com/image-20200709152643001.png" alt="image-20200709152643001"></p>
+<h2 id="执行SYNC命令"><a href="#执行SYNC命令" class="headerlink" title="执行SYNC命令"></a>执行SYNC命令</h2><p><img src="http://ali-md-pic.oss-cn-shenzhen.aliyuncs.com/md-pic-box/image-20200709152643001.png" alt="image-20200709152643001"></p>
 <h3 id="执行过程"><a href="#执行过程" class="headerlink" title="执行过程"></a>执行过程</h3><ul>
 <li><strong>主服务器</strong> 需要执行 <code>BGSAVE</code> 命令来生成 RDB 文件，这个生成操作会 <strong>消耗</strong> 主服务器大量的 <strong>CPU、内存和磁盘 I/O 的资源</strong>；</li>
 <li><strong>主服务器</strong> 需要将自己生成的 RDB 文件 发送给从服务器，这个发送操作会 <strong>消耗</strong> 主服务器 <strong>大量的网络资源</strong> <em>(带宽和流量)</em>，并对主服务器响应命令请求的时间产生影响；</li>
@@ -229,7 +229,7 @@
 <figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">#</span><span class="bash"> <span class="comment">#没有salve连接时，多久释放一次复制积压缓冲区</span></span></span><br><span class="line">repl-backlog-ttl 3600</span><br></pre></td></tr></table></figure>
 
 <p>Redis同时也提供了当没有slave需要同步的时候，多久可以<code>释放环形队列</code>，默认一小时。</p>
-<h3 id="执行过程-1"><a href="#执行过程-1" class="headerlink" title="执行过程"></a>执行过程</h3><p><img src="http://qd2x6jysb.bkt.clouddn.com/image-20200709154901864.png" alt="image-20200709154901864"></p>
+<h3 id="执行过程-1"><a href="#执行过程-1" class="headerlink" title="执行过程"></a>执行过程</h3><p><img src="http://ali-md-pic.oss-cn-shenzhen.aliyuncs.com/md-pic-box/image-20200709154901864.png" alt="image-20200709154901864"></p>
 <p><strong>与SYNC区别：salve连接时，判断是否需要全量同步，全量同步的逻辑过程和SYNC一样。</strong></p>
 <ol>
 <li><p>客户端向服务器发送<code>SLAVEOF</code>命令，即<code>salve</code>向<code>master</code>发起连接请求时，<code>slave</code>根据自己是否保存<code>Master runid</code>来判断是否是第一次连接；</p>
@@ -252,7 +252,7 @@
 <li>如果主服务器返回<code>+CONTINUE</code>回复，那么表示主服务器将与从服务器执行部分重同步操作，从服务器只要等着主服务器将自己缺少的那部分数据发送过来就可以了。</li>
 <li>如果主服务器返回<code>-ERR</code>回复，那么表示主服务器的版本低于Redis 2.8，它识别不了PSYNC命令，从服务器将向主服务器发送<code>SYNC命令</code>，并与主服务器执行完整同步操作。</li>
 </ul>
-<p><img src="http://qd2x6jysb.bkt.clouddn.com/image-20200709174851468.png" alt="image-20200709174851468"></p>
+<p><img src="http://ali-md-pic.oss-cn-shenzhen.aliyuncs.com/md-pic-box/image-20200709174851468.png" alt="image-20200709174851468"></p>
 <h2 id="主从存在的问题"><a href="#主从存在的问题" class="headerlink" title="主从存在的问题"></a>主从存在的问题</h2><ol>
 <li><p>一旦<strong>主节点宕机，从节点晋升为主节点</strong>，同时需要修改应用方的主节点地址，还需要命令所有从节点去复制新的主节点，整个过程需要人工干预。</p>
 </li>
@@ -265,7 +265,7 @@
 </li>
 </ol>
 <p><strong>解决方案：Sentinel（哨兵）</strong></p>
-<h2 id="Sentinel-哨兵"><a href="#Sentinel-哨兵" class="headerlink" title="Sentinel(哨兵)"></a>Sentinel(哨兵)</h2><p><img src="http://qd2x6jysb.bkt.clouddn.com/image-20200708033501008.png" alt="image-20200708033501008"></p>
+<h2 id="Sentinel-哨兵"><a href="#Sentinel-哨兵" class="headerlink" title="Sentinel(哨兵)"></a>Sentinel(哨兵)</h2><p><img src="http://ali-md-pic.oss-cn-shenzhen.aliyuncs.com/md-pic-box/image-20200708033501008.png" alt="image-20200708033501008"></p>
 <h3 id="功能"><a href="#功能" class="headerlink" title="功能"></a>功能</h3><ul>
 <li><strong>监控（Monitoring）：</strong> 哨兵会不断地检查主节点和从节点是否运作正常。</li>
 <li><strong>自动故障转移（Automatic failover）：</strong> 当 <strong>主节点</strong> 不能正常工作时，哨兵会开始 <strong>自动故障转移操作</strong>，它会将失效主节点的其中一个 <strong>从节点升级为新的主节点</strong>，并让其他从节点改为复制新的主节点。</li>
@@ -287,7 +287,7 @@
 </ul>
 <h3 id="初始化Sentinel"><a href="#初始化Sentinel" class="headerlink" title="初始化Sentinel"></a>初始化Sentinel</h3><ol>
 <li><p>初始化Sentinel状态（初始化如下对象）；</p>
-<p><img src="http://qd2x6jysb.bkt.clouddn.com/image-20200709180519642.png" alt="image-20200709180519642"></p>
+<p><img src="http://ali-md-pic.oss-cn-shenzhen.aliyuncs.com/md-pic-box/image-20200709180519642.png" alt="image-20200709180519642"></p>
 </li>
 <li><p>初始化Sentinel状态的masters属性；</p>
 <p>Sentinel状态中的masters字典记录了所有被Sentinel监视的主服务器的相关信息，其中：</p>
@@ -298,14 +298,14 @@
 <p>每个<code>sentinelRedisInstance</code>结构（后面简称“实例结构”）代表一个被Sentinel监视的Redis服务器实例（instance），这个实例可以是主服务器、从服务器，或者另外一个Sentinel。</p>
 </li>
 </ul>
-<p><img src="http://qd2x6jysb.bkt.clouddn.com/image-20200709180800213.png" alt="image-20200709180800213"></p>
+<p><img src="http://ali-md-pic.oss-cn-shenzhen.aliyuncs.com/md-pic-box/image-20200709180800213.png" alt="image-20200709180800213"></p>
 </li>
 <li><p>创建连向主服务器的异步网络连接；</p>
 <ul>
 <li>一个是==命令连接==，这个连接专门用于向主服务器发送命令，并接收命令回复。</li>
 <li>另一个是==订阅连接==，这个连接专门用于订阅主服务器的<code>__sentinel__:hello</code>频道。</li>
 </ul>
-<p><img src="http://qd2x6jysb.bkt.clouddn.com/image-20200709223540755.png" alt="image-20200709223540755"></p>
+<p><img src="http://ali-md-pic.oss-cn-shenzhen.aliyuncs.com/md-pic-box/image-20200709223540755.png" alt="image-20200709223540755"></p>
 </li>
 </ol>
 <h3 id="为什么有两个链接？"><a href="#为什么有两个链接？" class="headerlink" title="为什么有两个链接？"></a><strong>为什么有两个链接？</strong></h3><ul>
@@ -321,7 +321,7 @@
 <p>根据<code>run_id域</code>和<code>role域</code><strong>记录的信息</strong>，<code>Sentinel</code>将对主服务器的实例结构进行更新。例如，主服务器重启之后，它的<code>运行ID</code>就会和实例结构之前保存的<code>运行ID</code>不同，<code>Sentinel</code>检测到这一情况之后，就会对实例结构的<code>运行ID</code>进行更新。至于主服务器返回的<strong>从服务器信息</strong>，则会被用于更新主服务器实例结构的<code>slaves字典</code>。</p>
 </li>
 </ul>
-<p><img src="http://qd2x6jysb.bkt.clouddn.com/image-20200709224458594.png" alt="image-20200709224458594"></p>
+<p><img src="http://ali-md-pic.oss-cn-shenzhen.aliyuncs.com/md-pic-box/image-20200709224458594.png" alt="image-20200709224458594"></p>
 <h4 id="检测主观下线状态"><a href="#检测主观下线状态" class="headerlink" title="检测主观下线状态"></a>检测主观下线状态</h4><p>默认情况下，<code>Sentinel</code>会以每秒一次的频率向所有与它创建了命令连接的实例（包括主服务器、从服务器、其他<code>Sentinel</code>在内）发送<code>PING</code>命令，并通过实例返回的<code>PING</code>命令回复来判断实例是否在线。</p>
 <p>如果一个实例在<code>down-after-milliseconds</code>毫秒内，连续向<code>Sentinel</code>返回无效回复，那么<code>Sentinel</code>会修改这个实例所对应的实例结构，在<code>SentinelRedisInstance</code>结构的<code>flags</code>属性中打开<code>SRI_S_DOWN</code>标识，以此来表示这个实例已经进入<code>主观下线状态</code>。    </p>
 <p>用户设置的<code>down-after-milliseconds</code>选项的值，不仅会被<code>Sentinel</code>用来判断主服务器的主观下线状态，还会被用于判断主服务器属下的所有从服务器，以及所有同样监视这个主服务器的其他<code>Sentinel</code>的<code>主观下线状态</code>。举个例子，如果用户向<code>Sentinel</code>设置了以下配置：    </p>
@@ -334,11 +334,11 @@
 <ul>
 <li><p>询问其他Sentinel是否同意主服务器已下线：</p>
 <p>发送<code>SENTINEL is-master-down-by-addr &lt;ip&gt; &lt;port&gt; &lt;current_epoch&gt; &lt;runid&gt;</code>命令；</p>
-<p><img src="http://qd2x6jysb.bkt.clouddn.com/image-20200709230707930.png" alt="image-20200709230707930"></p>
+<p><img src="http://ali-md-pic.oss-cn-shenzhen.aliyuncs.com/md-pic-box/image-20200709230707930.png" alt="image-20200709230707930"></p>
 </li>
 <li><p>接收<code>SENTINEL is-master-down-by-addr</code>命令：</p>
 <p>当一个<code>Sentinel</code>（<code>目标Sentinel</code>）接收到另一个<code>Sentinel</code>（<code>源Sentinel</code>）发来的<code>SENTINEL is-master-down-by</code>命令时，<code>目标Sentinel</code>会分析并取出命令请求中包含的各个参数，并根据其中的<code>主服务器IP</code>和<code>端口号</code>，检查主服务器是否已下线，然后向<code>源Sentinel</code>返回一条<code>包含三个参数的Multi Bulk回复</code>作为SENTINEL is-master-down-by命令的回复：</p>
-<p><img src="http://qd2x6jysb.bkt.clouddn.com/image-20200709230551121.png" alt="image-20200709230551121"></p>
+<p><img src="http://ali-md-pic.oss-cn-shenzhen.aliyuncs.com/md-pic-box/image-20200709230551121.png" alt="image-20200709230551121"></p>
 </li>
 </ul>
 <p>当认为主服务器已经进入下线状态的<code>Sentinel</code>的数量，超过<code>Sentinel</code>配置中设置的<code>quorum参数</code>的值，那么该<code>Sentinel</code>就会认为主服务器已经进入客观下线状态：<code>sentinel monitor master 127.0.0.1 6379 5</code></p>
@@ -366,21 +366,21 @@
 </ul>
 </li>
 </ul>
-<h2 id="RedisCluster"><a href="#RedisCluster" class="headerlink" title="RedisCluster"></a>RedisCluster</h2><p><img src="http://qd2x6jysb.bkt.clouddn.com/image-20200708034042256.png" alt="image-20200708034042256"></p>
-<h3 id="基本原理"><a href="#基本原理" class="headerlink" title="基本原理"></a>基本原理</h3><p><img src="http://qd2x6jysb.bkt.clouddn.com/image-20200708034116188.png" alt="image-20200708034116188"></p>
+<h2 id="RedisCluster"><a href="#RedisCluster" class="headerlink" title="RedisCluster"></a>RedisCluster</h2><p><img src="http://ali-md-pic.oss-cn-shenzhen.aliyuncs.com/md-pic-box/image-20200708034042256.png" alt="image-20200708034042256"></p>
+<h3 id="基本原理"><a href="#基本原理" class="headerlink" title="基本原理"></a>基本原理</h3><p><img src="http://ali-md-pic.oss-cn-shenzhen.aliyuncs.com/md-pic-box/image-20200708034116188.png" alt="image-20200708034116188"></p>
 <p>Redis 集群中内置了 <code>16384</code> 个哈希槽。当客户端连接到 Redis 集群之后，会同时得到一份关于这个 <strong>集群的配置信息</strong>，当客户端具体对某一个 <code>key</code> 值进行操作时，会计算出它的一个 Hash 值，然后把结果对 <code>16384</code> <strong>求余数</strong>，这样每个 <code>key</code> 都会对应一个编号在 <code>0-16383</code> 之间的哈希槽，Redis 会根据节点数量 <strong>大致均等</strong> 的将哈希槽映射到不同的节点。</p>
 <h3 id="内部数据结构"><a href="#内部数据结构" class="headerlink" title="内部数据结构"></a>内部数据结构</h3><p><code>ClusterNode</code>结构：</p>
 <ul>
 <li><code>clusterNode</code> 结构保存了 <strong>一个节点的当前状态</strong>，包括创建时间、节点 id、ip 和端口号等。</li>
 <li>每个节点都会用一个 <code>clusterNode</code> 结构记录自己的状态，并为集群内所有其他节点都创建一个 <code>clusterNode</code> 结构来记录节点状态。</li>
 </ul>
-<p><img src="http://qd2x6jysb.bkt.clouddn.com/image-20200709233823043.png" alt="image-20200709233823043"></p>
+<p><img src="http://ali-md-pic.oss-cn-shenzhen.aliyuncs.com/md-pic-box/image-20200709233823043.png" alt="image-20200709233823043"></p>
 <p><code>ClusterState</code>结构：</p>
 <p><code>clusterState</code> 结构保存了在当前节点视角下，集群所处的状态。包括故障转移、槽迁移等。</p>
-<p><img src="http://qd2x6jysb.bkt.clouddn.com/image-20200709233945811.png" alt="image-20200709233945811"></p>
-<p><img src="http://qd2x6jysb.bkt.clouddn.com/image-20200710012755077.png" alt="image-20200710012755077"></p>
+<p><img src="http://ali-md-pic.oss-cn-shenzhen.aliyuncs.com/md-pic-box/image-20200709233945811.png" alt="image-20200709233945811"></p>
+<p><img src="http://ali-md-pic.oss-cn-shenzhen.aliyuncs.com/md-pic-box/image-20200710012755077.png" alt="image-20200710012755077"></p>
 <p>集群中执行命令：</p>
-<p><img src="http://qd2x6jysb.bkt.clouddn.com/image-20200710012717507.png" alt="image-20200710012717507"></p>
+<p><img src="http://ali-md-pic.oss-cn-shenzhen.aliyuncs.com/md-pic-box/image-20200710012717507.png" alt="image-20200710012717507"></p>
 <p>计算属于哪个槽：<code>CRC(KEY) &amp; 16383;</code></p>
 <ul>
 <li>当节点发现键所在的槽并非由自己负责处理的时候，节点就会向客户端返回一个<code>MOVED</code>错误，指引客户端转向至正在负责槽的节点。例如：<code>MOVED 10086 127.0.0.1:7002</code> ；</li>
@@ -394,12 +394,12 @@
 </ul>
 <figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">typedef</span> <span class="class"><span class="keyword">struct</span> <span class="title">clusterState</span> &#123;</span></span><br><span class="line"> 	<span class="comment">// ...</span></span><br><span class="line">  zskiplist *slots_to_keys;</span><br><span class="line">  <span class="comment">//...</span></span><br><span class="line">&#125; clusterState;</span><br></pre></td></tr></table></figure>
 
-<p><img src="http://qd2x6jysb.bkt.clouddn.com/image-20200710013155895.png" alt="image-20200710013155895"></p>
+<p><img src="http://ali-md-pic.oss-cn-shenzhen.aliyuncs.com/md-pic-box/image-20200710013155895.png" alt="image-20200710013155895"></p>
 <h3 id="重新分片"><a href="#重新分片" class="headerlink" title="重新分片"></a>重新分片</h3><p><code>Redis集群</code>的重新分片操作可以将任意数量已经指派给<code>某个节点（源节点）</code>的槽改为指派给<code>另一个节点（目标节点）</code>，并且相关槽所属的键值对也会从源节点被移动到目标节点。</p>
 <p>重新分片操作可以在线（online）进行，在重新分片的过程中，集群不需要下线，并且源节点和目标节点都可以继续处理命令请求。</p>
 <h5 id="实现原理"><a href="#实现原理" class="headerlink" title="实现原理"></a>实现原理</h5><p>由Redis集群管理软件<code>redis-trib</code>负责，Redis提供了进行重新分片所需的所有命令，而<code>redis-trib</code>则通过向源节点和目标节点发送命令来进行重新分片操作。</p>
-<p><img src="http://qd2x6jysb.bkt.clouddn.com/image-20200710013629213.png" alt="image-20200710013629213"></p>
-<img src="http://qd2x6jysb.bkt.clouddn.com/image-20200710013644451.png" alt="image-20200710013644451" style="zoom:67%;" />
+<p><img src="http://ali-md-pic.oss-cn-shenzhen.aliyuncs.com/md-pic-box/image-20200710013629213.png" alt="image-20200710013629213"></p>
+<img src="http://ali-md-pic.oss-cn-shenzhen.aliyuncs.com/md-pic-box/image-20200710013644451.png" alt="image-20200710013644451" style="zoom:67%;" />
 
 
 
@@ -429,7 +429,7 @@
 <li><p><strong>方案一：哈希值 % 节点数</strong></p>
 </li>
 <li><p><strong>方案二：一致性哈希分区</strong></p>
-<p><img src="http://qd2x6jysb.bkt.clouddn.com/image-20200708034627815.png" alt="image-20200708034627815"></p>
+<p><img src="http://ali-md-pic.oss-cn-shenzhen.aliyuncs.com/md-pic-box/image-20200708034627815.png" alt="image-20200708034627815"></p>
 </li>
 <li><p><strong>方案三：带有虚拟节点的一致性哈希分区</strong></p>
 </li>

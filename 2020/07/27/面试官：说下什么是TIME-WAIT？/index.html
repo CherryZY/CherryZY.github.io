@@ -131,7 +131,7 @@
 
 
 
-<h2 id="四次挥手"><a href="#四次挥手" class="headerlink" title="四次挥手"></a>四次挥手</h2><p><img src="http://qd2x6jysb.bkt.clouddn.com/image-20200711202729020.png" alt="image-20200711202729020"></p>
+<h2 id="四次挥手"><a href="#四次挥手" class="headerlink" title="四次挥手"></a>四次挥手</h2><p><img src="http://ali-md-pic.oss-cn-shenzhen.aliyuncs.com/md-pic-box/image-20200711202729020.png" alt="image-20200711202729020"></p>
 <p>客户端发起终止连接（<code>FIN</code>），但是由于TCP是全双工的，所以还需要服务端向客户端也发送<code>FIN</code>发起终止当前连接。</p>
 <p>坦白来说：</p>
 <p>当一方完成数据发送任务后，发送一个<code>FIN</code>来终止这一方向的连接，收到一个<code>FIN</code>只是意味着这一方向上没有数据流动了，即不会再收到数据了，但是在这个<code>TCP</code>连接上仍然能够发送数据，直到这一方向也发送了<code>FIN</code>。</p>

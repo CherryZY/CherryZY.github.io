@@ -121,16 +121,16 @@
         <h3 id="Redis中的字符串对象编码？"><a href="#Redis中的字符串对象编码？" class="headerlink" title="Redis中的字符串对象编码？"></a>Redis中的字符串对象编码？</h3><ul>
 <li><p><strong>raw</strong></p>
 <p>如果字符串对象保存的是一个字符串值，并且这个字符串值的<code>长度大于32字节</code>，那么字符串对象将使用一个<code>简单动态字符串（SDS）</code>来保存这个字符串值，并将对象的编码设置为<code>raw</code>：</p>
-<p><img src="http://qd2x6jysb.bkt.clouddn.com/image-20200708150012598.png" alt="image-20200708150012598"></p>
+<p><img src="http://ali-md-pic.oss-cn-shenzhen.aliyuncs.com/md-pic-box/image-20200708150012598.png" alt="image-20200708150012598"></p>
 </li>
 <li><p><strong>embstr</strong></p>
 <p>如果字符串对象保存的是一个字符串值，并且这个字符串值的<code>长度小于等于32字节</code>，那么字符串对象将使用<code>embstr编码</code>的方式来保存这个字符串值：</p>
-<p><img src="http://qd2x6jysb.bkt.clouddn.com/image-20200708151458048.png" alt="image-20200708151458048"></p>
+<p><img src="http://ali-md-pic.oss-cn-shenzhen.aliyuncs.com/md-pic-box/image-20200708151458048.png" alt="image-20200708151458048"></p>
 <p><strong><code>raw编码</code>会调用两次内存分配函数来分别创建<code>redisObject结构</code>和<code>sdshdr结构</code>，而<code>embstr编码</code>则通过调用一次内存分配函数来分配一块连续的空间，空间中依次包含<code>redisObject</code>和<code>sdshdr</code>两个结构。</strong></p>
 </li>
 <li><p><strong>int</strong></p>
 <p>如果一个字符串对象保存的是整数值，并且这个整数值可以用<code>long类型</code>来表示，那么字符串对象会<code>将整数值保存在字符串对象结构的ptr属性</code>里面（<code>将void*转换成long</code>），并将字符串对象的编码设置为int：</p>
-<p><img src="http://qd2x6jysb.bkt.clouddn.com/image-20200708150416421.png" alt="image-20200708150416421"></p>
+<p><img src="http://ali-md-pic.oss-cn-shenzhen.aliyuncs.com/md-pic-box/image-20200708150416421.png" alt="image-20200708150416421"></p>
 </li>
 </ul>
 

@@ -149,10 +149,10 @@
 
 <h3 id="Set"><a href="#Set" class="headerlink" title="Set"></a>Set</h3><ul>
 <li><p><strong>IntSet</strong></p>
-<p><img src="http://qd2x6jysb.bkt.clouddn.com/image-20200708152254203.png" alt="image-20200708152254203"></p>
+<p><img src="http://ali-md-pic.oss-cn-shenzhen.aliyuncs.com/md-pic-box/image-20200708152254203.png" alt="image-20200708152254203"></p>
 </li>
 <li><p><strong>Dict（hashtable）</strong></p>
-<p><img src="http://qd2x6jysb.bkt.clouddn.com/image-20200708152304695.png" alt="image-20200708152304695"></p>
+<p><img src="http://ali-md-pic.oss-cn-shenzhen.aliyuncs.com/md-pic-box/image-20200708152304695.png" alt="image-20200708152304695"></p>
 </li>
 </ul>
 <h4 id="编码转换-1"><a href="#编码转换-1" class="headerlink" title="编码转换"></a>编码转换</h4><p>当集合对象可以同时满足以下两个条件时，对象使用intset编码：</p>
@@ -173,8 +173,8 @@
 </ul>
 <h5 id="ZipList编码（REDIS-ENCODING-ZIPLIST）"><a href="#ZipList编码（REDIS-ENCODING-ZIPLIST）" class="headerlink" title="ZipList编码（REDIS_ENCODING_ZIPLIST）"></a><strong>ZipList</strong>编码（<code>REDIS_ENCODING_ZIPLIST</code>）</h5><p><code>ziplist编码</code>的压缩列表对象使用<strong>压缩列表</strong>作为底层实现，每个集合元素使用两个紧挨在一起的压缩列表节点来保存，<strong>第一个节点保存元素的成员（member），而第二个元素则保存元素的分值（score）</strong>。</p>
 <p>压缩列表内的集合元素按<strong>分值从小到大进行排序</strong>，<strong>分值较小的元素被放置在靠近表头的方向，而分值较大的元素则被放置在靠近表尾的方向</strong>。</p>
-<p><img src="http://qd2x6jysb.bkt.clouddn.com/image-20200708153022699.png" alt="image-20200708153022699"></p>
-<h5 id="SkipList编码（REDIS-ENCODING-SKIPLIST）"><a href="#SkipList编码（REDIS-ENCODING-SKIPLIST）" class="headerlink" title="SkipList编码（REDIS_ENCODING_SKIPLIST）"></a>SkipList编码（<code>REDIS_ENCODING_SKIPLIST</code>）</h5><p><img src="http://qd2x6jysb.bkt.clouddn.com/image-20200708153127512.png" alt="image-20200708153127512"></p>
+<p><img src="http://ali-md-pic.oss-cn-shenzhen.aliyuncs.com/md-pic-box/image-20200708153022699.png" alt="image-20200708153022699"></p>
+<h5 id="SkipList编码（REDIS-ENCODING-SKIPLIST）"><a href="#SkipList编码（REDIS-ENCODING-SKIPLIST）" class="headerlink" title="SkipList编码（REDIS_ENCODING_SKIPLIST）"></a>SkipList编码（<code>REDIS_ENCODING_SKIPLIST</code>）</h5><p><img src="http://ali-md-pic.oss-cn-shenzhen.aliyuncs.com/md-pic-box/image-20200708153127512.png" alt="image-20200708153127512"></p>
 <p><code>skiplist编码</code>的有序集合对象使用<code>zset结构</code>作为底层实现，一个<code>zset结构</code>同时包含<code>一个字典</code>和<code>一个跳跃表</code>：</p>
 <figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">typedef</span> <span class="class"><span class="keyword">struct</span> <span class="title">zset</span> &#123;</span></span><br><span class="line">	zskiplist *zsl;</span><br><span class="line">	dict *dict;</span><br><span class="line">&#125; zset;</span><br></pre></td></tr></table></figure>
 
@@ -246,8 +246,8 @@
 <h4 id="GEO算法"><a href="#GEO算法" class="headerlink" title="GEO算法"></a>GEO算法</h4><p>GeoHash 算法将 <code>二维的经纬度</code> 数据映射到 <code>一维</code> 的整数，<strong>这样所有的元素都将在挂载到一条线上，距离靠近的二维坐标映射到一维后的点之间距离也会很接近。</strong><br><strong>当我们想要计算 「附近的人时」，首先将目标位置映射到这条线上，然后在这个一维的线上获取附近的点就行了。</strong></p>
 <p><strong>核心思想：</strong></p>
 <p>就是把整个地球看成是一个 二维的平面，然后把这个平面不断地等分成一个一个小的方格，每一个 坐标元素都位于其中的 唯一一个方格 中，等分之后的 方格越小，那么坐标也就 越精确。</p>
-<h4 id="步骤"><a href="#步骤" class="headerlink" title="步骤"></a>步骤</h4><p><img src="http://qd2x6jysb.bkt.clouddn.com/prefix_20200707162935.jpg" alt="geo-image-1"></p>
-<p><img src="http://qd2x6jysb.bkt.clouddn.com/prefix_20200707162942.jpg" alt="geo-image-2"></p>
+<h4 id="步骤"><a href="#步骤" class="headerlink" title="步骤"></a>步骤</h4><p><img src="http://ali-md-pic.oss-cn-shenzhen.aliyuncs.com/md-pic-box/prefix_20200707162935.jpg" alt="geo-image-1"></p>
+<p><img src="http://ali-md-pic.oss-cn-shenzhen.aliyuncs.com/md-pic-box/prefix_20200707162942.jpg" alt="geo-image-2"></p>
 <p>   把任意坐标变成一串二进制的编码了，类似于 <code>11010010110001000100</code> 这样，通过这个整数我们就可以还原出元素的坐标，整数越长，还原出来的坐标值的损失程序就越小。</p>
 <p>规律：</p>
 <ul>
@@ -269,7 +269,7 @@
 <p>获取计数</p>
 </li>
 </ul>
-<h4 id="实现原理"><a href="#实现原理" class="headerlink" title="实现原理"></a>实现原理</h4><p><img src="http://qd2x6jysb.bkt.clouddn.com/prefix_20200707170136.jpg" alt="hyperloglog-image"></p>
+<h4 id="实现原理"><a href="#实现原理" class="headerlink" title="实现原理"></a>实现原理</h4><p><img src="http://ali-md-pic.oss-cn-shenzhen.aliyuncs.com/md-pic-box/prefix_20200707170136.jpg" alt="hyperloglog-image"></p>
 <p>给定一系列的随机整数，我们记录下低位连续零位的最大长度 k，通过这个 k 值可以估算出随机数的数量。</p>
 <p>利用集合中数字的比特串第一个1出现位置的最大值来预估整体基数，但是这种预估方法存在较大误差，为了改善误差情况，HLL中引入分桶平均的概念。</p>
 <h3 id="BloomFilter"><a href="#BloomFilter" class="headerlink" title="BloomFilter"></a>BloomFilter</h3><p>场景：比如我们在使用新闻客户端看新闻时，它会给我们不停地推荐新的内容，它每次推荐时要去重，去掉那些已经看过的内容。问题来了，<strong>新闻客户端推荐系统如何实现推送去重的？</strong></p>
@@ -279,7 +279,7 @@
 <h5 id="bf-exists-bf-mexists"><a href="#bf-exists-bf-mexists" class="headerlink" title="bf.exists/bf.mexists"></a>bf.exists/bf.mexists</h5><p><code>bf.exists codehole user4</code></p>
 <p><code>bf.mexists codehole user4 user5 user6 user7</code></p>
 <p>查询元素是否存在</p>
-<h4 id="原理"><a href="#原理" class="headerlink" title="原理"></a>原理</h4><p><img src="http://qd2x6jysb.bkt.clouddn.com/prefix_20200707172454.jpg" alt="bloomFilter-image"></p>
+<h4 id="原理"><a href="#原理" class="headerlink" title="原理"></a>原理</h4><p><img src="http://ali-md-pic.oss-cn-shenzhen.aliyuncs.com/md-pic-box/prefix_20200707172454.jpg" alt="bloomFilter-image"></p>
 <p><strong>每个布隆过滤器对应到 Redis 的数据结构里面就是一个大型的位数组和几个不一样的无偏 hash 函数。所谓无偏就是能够把元素的 hash 值算得比较均匀。</strong></p>
 <h5 id="add操作"><a href="#add操作" class="headerlink" title="add操作"></a>add操作</h5><p>向布隆过滤器中添加 <code>key</code> 时，会使用多个 <code>hash</code> 函数对<code>key</code> 进行 <code>hash</code>算得一个整数索引值然后对位数组长度进行取模运算得到一个位置，每个 <code>hash</code> 函数都会算得一个不同的位置。</p>
 <p>再把位数组的这几个位置都置为 1 就完成了<code>add</code>操作。</p>
@@ -292,7 +292,7 @@
 <li><strong>支持高可用</strong>。但是因为Redis指令复制是异步的。在<code>failOver</code>发生时，Redis可能会丢失极小部分数据。</li>
 <li><strong>分区</strong>。没有原生分区支持，必须在客户端进行策略生产消息到不同的Stream。</li>
 </ul>
-<h4 id="结构-1"><a href="#结构-1" class="headerlink" title="结构"></a>结构</h4><p><img src="http://qd2x6jysb.bkt.clouddn.com/prefix_20200707211302.jpg" alt="stream-struct-image"></p>
+<h4 id="结构-1"><a href="#结构-1" class="headerlink" title="结构"></a>结构</h4><p><img src="http://ali-md-pic.oss-cn-shenzhen.aliyuncs.com/md-pic-box/prefix_20200707211302.jpg" alt="stream-struct-image"></p>
 <h4 id="消息"><a href="#消息" class="headerlink" title="消息"></a>消息</h4><h5 id="语法格式"><a href="#语法格式" class="headerlink" title="语法格式"></a>语法格式</h5><figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">XADD key ID field string [field string ...]</span><br></pre></td></tr></table></figure>
 
 <figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">例如：</span><br><span class="line">xadd mystream1 * name hb age 20</span><br></pre></td></tr></table></figure>
@@ -380,7 +380,7 @@
 <p><code>Redis</code>给<code>Stream</code>提供一种定长<code>Stream</code>功能，在<code>XADD</code>的指令提供一个定长长度<code>MAXLEN</code>，就可以将老的消息干掉。</p>
 <figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">XADD streamName MAXLEN 10</span><br></pre></td></tr></table></figure>
 
-<p><img src="http://qd2x6jysb.bkt.clouddn.com/image-20200708024900885.png" alt="image-20200708024900885"></p>
+<p><img src="http://ali-md-pic.oss-cn-shenzhen.aliyuncs.com/md-pic-box/image-20200708024900885.png" alt="image-20200708024900885"></p>
 <p>方案二：</p>
 <p>MAXLEN开销大，Stream为了节省内存空间，采用一种带有<code>~</code>的特殊命令：（至少保存1000条数据）</p>
 <figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">XADD streamName MAXLEN ~ 1000 * ... entry fields here...</span><br></pre></td></tr></table></figure>
@@ -395,7 +395,7 @@
 <figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line"><span class="class"><span class="keyword">struct</span> <span class="title">redisServer</span> &#123;</span></span><br><span class="line">    <span class="comment">// ...</span></span><br><span class="line">    dict *pubsub_channels;  <span class="comment">// 订阅频道</span></span><br><span class="line">    <span class="built_in">list</span> *pubsub_patterns;  <span class="comment">// 订阅模式</span></span><br><span class="line">    <span class="comment">// ...</span></span><br><span class="line">&#125;;</span><br></pre></td></tr></table></figure>
 
 <h5 id="pubsub-channels"><a href="#pubsub-channels" class="headerlink" title="pubsub_channels"></a>pubsub_channels</h5><p>当客户端订阅某一个频道之后，Redis 就会往 <code>pubsub_channels</code> 这个字典中新添加一条数据，实际上这个 <code>dict</code> 字典维护的是一张链表，比如，下图展示的 <code>pubsub_channels</code> 示例中，<code>client 1</code>、<code>client 2</code> 就订阅了 <code>channel 1</code>，而其他频道也分别被其他客户端订阅：</p>
-<p><img src="http://qd2x6jysb.bkt.clouddn.com/prefix_20200707205838.jpg" alt="pubsub-image"></p>
+<p><img src="http://ali-md-pic.oss-cn-shenzhen.aliyuncs.com/md-pic-box/prefix_20200707205838.jpg" alt="pubsub-image"></p>
 <h5 id="pubsub-patterns"><a href="#pubsub-patterns" class="headerlink" title="pubsub_patterns"></a>pubsub_patterns</h5><p>当发送一条消息到 <code>wmyskxz.chat</code> 这个频道时，Redis 不仅仅会发送到当前的频道，还会发送到匹配于当前模式的所有频道，实际上，<code>pubsub_patterns</code> 背后还维护了一个 <code>redis.h/pubsubPattern</code> 结构：</p>
 <figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">typedef</span> <span class="class"><span class="keyword">struct</span> <span class="title">pubsubPattern</span> &#123;</span> </span><br><span class="line">	redisClient *client; <span class="comment">// 订阅模式的客户端 </span></span><br><span class="line">	robj *pattern; <span class="comment">// 订阅的模式 </span></span><br><span class="line">&#125; pubsubPattern;</span><br></pre></td></tr></table></figure>
 
@@ -420,7 +420,7 @@
 </ol>
 <h3 id="PipLine"><a href="#PipLine" class="headerlink" title="PipLine"></a>PipLine</h3><p>对于单线程阻塞式的Redis，Pipeline可以满足批量的操作，把多个命令连续的发送给Redis Server，然后一一解析响应结果。Pipelining可以提高批量处理性能，提升的原因主要是TCP连接中减少了“交互往返”的时间。</p>
 <p>pipeline 底层是<strong>通过把所有的操作封装成流，redis有定义自己的出入输出流</strong>。在 <code>sync()</code>方法执行操作，每次请求放在队列里面，解析响应包。</p>
-<h2 id="基础数据结构"><a href="#基础数据结构" class="headerlink" title="基础数据结构"></a>基础数据结构</h2><h3 id="SDS（Simple-Dynamic-String）"><a href="#SDS（Simple-Dynamic-String）" class="headerlink" title="SDS（Simple Dynamic String）"></a>SDS（Simple Dynamic String）</h3><h4 id="结构-2"><a href="#结构-2" class="headerlink" title="结构"></a>结构</h4><p><img src="http://qd2x6jysb.bkt.clouddn.com/prefix_20200707143539.jpg" alt="sds-string-struct"></p>
+<h2 id="基础数据结构"><a href="#基础数据结构" class="headerlink" title="基础数据结构"></a>基础数据结构</h2><h3 id="SDS（Simple-Dynamic-String）"><a href="#SDS（Simple-Dynamic-String）" class="headerlink" title="SDS（Simple Dynamic String）"></a>SDS（Simple Dynamic String）</h3><h4 id="结构-2"><a href="#结构-2" class="headerlink" title="结构"></a>结构</h4><p><img src="http://ali-md-pic.oss-cn-shenzhen.aliyuncs.com/md-pic-box/prefix_20200707143539.jpg" alt="sds-string-struct"></p>
 <p>数据有多重定义，可以根据数据大小，定义不同的数据类型：<code>sdshdr5/8/16/32/64</code></p>
 <h4 id="与String区别"><a href="#与String区别" class="headerlink" title="与String区别"></a>与String区别</h4><ol>
 <li>获取字符串长度<ul>
@@ -445,7 +445,7 @@
 </blockquote>
 <h4 id="结构-3"><a href="#结构-3" class="headerlink" title="结构"></a>结构</h4><ul>
 <li><p>内部由Hash表构成。（数组+链表，类似HashMap，扩容2*n，第一维2^n）</p>
-<p><img src="http://qd2x6jysb.bkt.clouddn.com/prefix_20200707141914.jpg" alt="dict-image"></p>
+<p><img src="http://ali-md-pic.oss-cn-shenzhen.aliyuncs.com/md-pic-box/prefix_20200707141914.jpg" alt="dict-image"></p>
 <p>通过链表解决Hash冲突；</p>
 <p>字典内部包含两个dictht结构组成。</p>
 </li>
@@ -486,14 +486,14 @@
 <li><code>LPUSH</code>、<code>RPUSH</code> 可以向链表首尾新增数据。</li>
 <li><code>LBPUSH</code>、<code>RBPOP</code> 可以阻塞<code>push/pop</code>数据，倘若没有数据，则阻塞等待，来数据后立即唤醒。</li>
 </ul>
-<h4 id="结构-4"><a href="#结构-4" class="headerlink" title="结构"></a>结构</h4><p><img src="http://qd2x6jysb.bkt.clouddn.com/prefix_20200707143212.jpg" alt="list-data-struct"></p>
+<h4 id="结构-4"><a href="#结构-4" class="headerlink" title="结构"></a>结构</h4><p><img src="http://ali-md-pic.oss-cn-shenzhen.aliyuncs.com/md-pic-box/prefix_20200707143212.jpg" alt="list-data-struct"></p>
 <h3 id="ZipList"><a href="#ZipList" class="headerlink" title="ZipList"></a>ZipList</h3><blockquote>
 <p>参考：<a href="https://mp.weixin.qq.com/s?__biz=MzA4NTg1MjM0Mg==&amp;mid=2657261265&amp;idx=1&amp;sn=e105c4b86a5640c5fc8212cd824f750b&amp;scene=21#wechat_redirect" target="_blank" rel="noopener">https://mp.weixin.qq.com/s?__biz=MzA4NTg1MjM0Mg==&amp;mid=2657261265&amp;idx=1&amp;sn=e105c4b86a5640c5fc8212cd824f750b&amp;scene=21#wechat_redirect</a></p>
 </blockquote>
 <p><code>ziplist</code>是一个经过特殊编码的字节数组，它的设计目标就是为了提高存储效率。<br><code>ziplist</code>可以用于<strong>存储字符串或整数</strong>，其中<strong>整数是按真正的二进制表示进行编码的</strong>，而不是编码成字符串序列。它能以<code>O(1)</code>的时间复杂度在表的两端提供<code>push</code>和<code>pop</code>操作。</p>
 <p>当<strong>元素长度较小</strong>时，采用<code>ziplist</code>可以有效<strong>节省存储空间</strong>，但<code>ziplist</code>的存储空间是连续的；</p>
 <p>当<strong>元素个数比较多</strong>时，修改元素时，必须重新分配存储空间；</p>
-<h4 id="结构-5"><a href="#结构-5" class="headerlink" title="结构"></a>结构</h4><p><img src="http://qd2x6jysb.bkt.clouddn.com/prefix_20200707144403.jpg" alt="ziplist-imge-data-struct"></p>
+<h4 id="结构-5"><a href="#结构-5" class="headerlink" title="结构"></a>结构</h4><p><img src="http://ali-md-pic.oss-cn-shenzhen.aliyuncs.com/md-pic-box/prefix_20200707144403.jpg" alt="ziplist-imge-data-struct"></p>
 <h5 id="属性"><a href="#属性" class="headerlink" title="属性"></a>属性</h5><ul>
 <li><p><strong>zlbytes</strong><br>压缩列表字节长度，占4个字节；</p>
 </li>
@@ -510,7 +510,7 @@
 <p>压缩列表的结尾，恒为0xFF， 1个字节；</p>
 </li>
 </ul>
-<p><img src="http://qd2x6jysb.bkt.clouddn.com/prefix_20200707145523.jpg" alt="ziplist-entry-image"></p>
+<p><img src="http://ali-md-pic.oss-cn-shenzhen.aliyuncs.com/md-pic-box/prefix_20200707145523.jpg" alt="ziplist-entry-image"></p>
 <p>属性值：</p>
 <ul>
 <li><p><strong>previous_entry_length</strong>：</p>
@@ -562,16 +562,16 @@
 <li>当<code>ziplist</code>数据项过多的时候，在它上面查找指定的数据项就会性能变得很低，因为<code>ziplist</code>上的查找需要进行遍历。</li>
 </ul>
 <h4 id="数据操作"><a href="#数据操作" class="headerlink" title="数据操作"></a>数据操作</h4><h5 id="初始化"><a href="#初始化" class="headerlink" title="初始化"></a>初始化</h5><p>创建压缩列表（11字节 –<code>zlbyte + zltail + zllen + zlend</code>）</p>
-<h5 id="插入元素"><a href="#插入元素" class="headerlink" title="插入元素"></a>插入元素</h5><p><img src="http://qd2x6jysb.bkt.clouddn.com/prefix_20200707145523.jpg" alt="zipList-insert-image"></p>
+<h5 id="插入元素"><a href="#插入元素" class="headerlink" title="插入元素"></a>插入元素</h5><p><img src="http://ali-md-pic.oss-cn-shenzhen.aliyuncs.com/md-pic-box/prefix_20200707145523.jpg" alt="zipList-insert-image"></p>
 <ul>
 <li>1）当压缩列表为空、插入位置为<code>P0</code>时，不存在前一个元素，即前一个元素的长度为0；</li>
 </ul>
-<p><img src="http://qd2x6jysb.bkt.clouddn.com/prefix_20200707145801.jpg" alt="ziplist-insert2-image"></p>
+<p><img src="http://ali-md-pic.oss-cn-shenzhen.aliyuncs.com/md-pic-box/prefix_20200707145801.jpg" alt="ziplist-insert2-image"></p>
 <ul>
 <li>2）当插入位置为<code>P1</code>，需要获取<code>entryX</code>元素的长度，而<code>entryX+1</code>元素的<code>previous_entry_length</code>字段存储的就是<code>entryX元素的长度</code>，比较容易获取；</li>
 <li>3）当插入位置为<code>P2</code>时，需要获取<code>entryN</code>元素的长度，<code>entryN</code>是压缩列表的尾元素，计算元素长度时需要将其3个字段长度相加；</li>
 </ul>
-<h6 id="那么空间大小是不是添加元素前的压缩列表长度与新添加元素长度之和呢？"><a href="#那么空间大小是不是添加元素前的压缩列表长度与新添加元素长度之和呢？" class="headerlink" title="* 那么空间大小是不是添加元素前的压缩列表长度与新添加元素长度之和呢？"></a>* <strong>那么空间大小是不是添加元素前的压缩列表长度与新添加元素长度之和呢？</strong></h6><p><img src="http://qd2x6jysb.bkt.clouddn.com/prefix_20200707150002.jpg" alt="ziplist-image-sum"></p>
+<h6 id="那么空间大小是不是添加元素前的压缩列表长度与新添加元素长度之和呢？"><a href="#那么空间大小是不是添加元素前的压缩列表长度与新添加元素长度之和呢？" class="headerlink" title="* 那么空间大小是不是添加元素前的压缩列表长度与新添加元素长度之和呢？"></a>* <strong>那么空间大小是不是添加元素前的压缩列表长度与新添加元素长度之和呢？</strong></h6><p><img src="http://ali-md-pic.oss-cn-shenzhen.aliyuncs.com/md-pic-box/prefix_20200707150002.jpg" alt="ziplist-image-sum"></p>
 <p>插入元素前，<code>entryX</code>元素的长度为128字节，<code>entryX+1</code>元素的<code>previous_entry_length</code>字段占1个字节；</p>
 <p>添加元素<code>entryNEW</code>，元素长度为1024字节，此时<code>entryX+1</code>元素的<code>previous_entry_length</code>字段需要占5个字节，即压缩列表的长度不仅增加了1024个字节，还要加上<code>entryX+1</code>元素扩展的4个字节。而<code>entryX+1</code>元素的长度可能增加4个字节、减少4个字节或不变；</p>
 <p>由于重新分配了空间，新元素插入的位置<code>指针P</code>会失效，可以预先计算好指针P相对于压缩列表首地址的偏移量，待分配空间之后再偏移即可。</p>
@@ -586,8 +586,8 @@
 <h4 id="用途-1"><a href="#用途-1" class="headerlink" title="用途"></a>用途</h4><ul>
 <li>Set</li>
 </ul>
-<h4 id="结构-6"><a href="#结构-6" class="headerlink" title="结构"></a>结构</h4><p><img src="http://qd2x6jysb.bkt.clouddn.com/prefix_20200707150539.jpg" alt="intset-data-struct-image"></p>
-<p><img src="http://qd2x6jysb.bkt.clouddn.com/prefix_20200707150611.jpg" alt="inset-struct-image"></p>
+<h4 id="结构-6"><a href="#结构-6" class="headerlink" title="结构"></a>结构</h4><p><img src="http://ali-md-pic.oss-cn-shenzhen.aliyuncs.com/md-pic-box/prefix_20200707150539.jpg" alt="intset-data-struct-image"></p>
+<p><img src="http://ali-md-pic.oss-cn-shenzhen.aliyuncs.com/md-pic-box/prefix_20200707150611.jpg" alt="inset-struct-image"></p>
 <ul>
 <li><p><strong>encoding</strong></p>
 <p>数据编码，表示Inset中的每个数据元素用几个字节存储：</p>
@@ -606,13 +606,13 @@
 </ul>
 <h4 id="操作流程"><a href="#操作流程" class="headerlink" title="操作流程"></a>操作流程</h4><ul>
 <li><p>查找</p>
-<p><img src="http://qd2x6jysb.bkt.clouddn.com/prefix_20200707151206.jpg" alt="IntSet-image-search"></p>
+<p><img src="http://ali-md-pic.oss-cn-shenzhen.aliyuncs.com/md-pic-box/prefix_20200707151206.jpg" alt="IntSet-image-search"></p>
 </li>
 <li><p>新增</p>
-<p><img src="http://qd2x6jysb.bkt.clouddn.com/prefix_20200707151443.jpg" alt="inset-image-insert"></p>
+<p><img src="http://ali-md-pic.oss-cn-shenzhen.aliyuncs.com/md-pic-box/prefix_20200707151443.jpg" alt="inset-image-insert"></p>
 </li>
 <li><p>删除</p>
-<p><img src="http://qd2x6jysb.bkt.clouddn.com/prefix_20200707151443.jpg" alt="intset-image-del"></p>
+<p><img src="http://ali-md-pic.oss-cn-shenzhen.aliyuncs.com/md-pic-box/prefix_20200707151443.jpg" alt="intset-image-del"></p>
 </li>
 </ul>
 <h3 id="QuickList（List-ZipList）"><a href="#QuickList（List-ZipList）" class="headerlink" title="QuickList（List + ZipList）"></a>QuickList（List + ZipList）</h3><blockquote>
@@ -628,8 +628,8 @@
 <h4 id="用途-2"><a href="#用途-2" class="headerlink" title="用途"></a>用途</h4><ul>
 <li>List</li>
 </ul>
-<h4 id="结构-7"><a href="#结构-7" class="headerlink" title="结构"></a>结构</h4><p><img src="http://qd2x6jysb.bkt.clouddn.com/prefix_20200707151915.jpg" alt="quicklist-image-struct"></p>
-<p><img src="http://qd2x6jysb.bkt.clouddn.com/prefix_20200707152258.jpg" alt="ziplist-image-struct"></p>
+<h4 id="结构-7"><a href="#结构-7" class="headerlink" title="结构"></a>结构</h4><p><img src="http://ali-md-pic.oss-cn-shenzhen.aliyuncs.com/md-pic-box/prefix_20200707151915.jpg" alt="quicklist-image-struct"></p>
+<p><img src="http://ali-md-pic.oss-cn-shenzhen.aliyuncs.com/md-pic-box/prefix_20200707152258.jpg" alt="ziplist-image-struct"></p>
 <p>如图参数配置为：</p>
 <figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">list-max-ziplist-size 3 （一个ziplist最大存储数量为3）</span><br><span class="line">list-compress-depth 2 （两端各有2个node中ziplist数据不压缩）</span><br></pre></td></tr></table></figure>
 
@@ -721,11 +721,11 @@
 <blockquote>
 <p><a href="https://mp.weixin.qq.com/s/6aFwnnnYIv3mWm0YkXWn9w" target="_blank" rel="noopener">https://mp.weixin.qq.com/s/6aFwnnnYIv3mWm0YkXWn9w</a></p>
 </blockquote>
-<h3 id="SkipList"><a href="#SkipList" class="headerlink" title="SkipList"></a>SkipList</h3><h4 id="结构-8"><a href="#结构-8" class="headerlink" title="结构"></a>结构</h4><p><img src="http://qd2x6jysb.bkt.clouddn.com/image-20200710150506356.png" alt="image-20200710150506356"></p>
-<p><img src="http://qd2x6jysb.bkt.clouddn.com/prefix_20200707161430.jpg" alt="skiplist-image-struct"></p>
-<p><img src="http://qd2x6jysb.bkt.clouddn.com/prefix_20200707161512.jpg" alt="skiplist-code-struct-image"></p>
+<h3 id="SkipList"><a href="#SkipList" class="headerlink" title="SkipList"></a>SkipList</h3><h4 id="结构-8"><a href="#结构-8" class="headerlink" title="结构"></a>结构</h4><p><img src="http://ali-md-pic.oss-cn-shenzhen.aliyuncs.com/md-pic-box/image-20200710150506356.png" alt="image-20200710150506356"></p>
+<p><img src="http://ali-md-pic.oss-cn-shenzhen.aliyuncs.com/md-pic-box/prefix_20200707161430.jpg" alt="skiplist-image-struct"></p>
+<p><img src="http://ali-md-pic.oss-cn-shenzhen.aliyuncs.com/md-pic-box/prefix_20200707161512.jpg" alt="skiplist-code-struct-image"></p>
 <p>初始化：</p>
-<p><img src="http://qd2x6jysb.bkt.clouddn.com/prefix_20200707161554.jpg" alt="skiplist-initial-image"></p>
+<p><img src="http://ali-md-pic.oss-cn-shenzhen.aliyuncs.com/md-pic-box/prefix_20200707161554.jpg" alt="skiplist-initial-image"></p>
 <h4 id="特点-4"><a href="#特点-4" class="headerlink" title="特点"></a>特点</h4><ul>
 <li>查询为二分法，时间复杂度：<code>O(n)</code>；</li>
 <li>对于每一个新插入的节点，都需要调用一个随机算法给它分配一个合理的层数；</li>
@@ -755,7 +755,7 @@
 <h3 id="Bitmap（位图）"><a href="#Bitmap（位图）" class="headerlink" title="Bitmap（位图）"></a>Bitmap（位图）</h3><p>存储bool数据。</p>
 <p>位图不是特殊的数据结构，它的内容其实就是普通的字符串，也就是 byte 数组。</p>
 <p>我们可以使用普通的<code>get/set</code> 直接获取和设置整个位图的内容，也可以使用位图操作 <code>getbit/setbit</code> 等将 byte 数组看成「位数组」来处理。</p>
-<h4 id="使用位操作设置字符串he"><a href="#使用位操作设置字符串he" class="headerlink" title="使用位操作设置字符串he"></a>使用位操作设置字符串<code>he</code></h4><p><img src="http://qd2x6jysb.bkt.clouddn.com/prefix_20200707164818.jpg" alt="bitmap-struct-image"></p>
+<h4 id="使用位操作设置字符串he"><a href="#使用位操作设置字符串he" class="headerlink" title="使用位操作设置字符串he"></a>使用位操作设置字符串<code>he</code></h4><p><img src="http://ali-md-pic.oss-cn-shenzhen.aliyuncs.com/md-pic-box/prefix_20200707164818.jpg" alt="bitmap-struct-image"></p>
 <ol>
 <li><p>首先使用<code>bin(ord(&#39;h&#39;))</code>命令获取ASCII码：<code>0b1101000</code></p>
 <p><code>bin(order(&#39;e&#39;))</code>获取ASCII码：<code>0b1100101</code></p>

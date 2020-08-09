@@ -151,7 +151,7 @@
 <h4 id="空间复杂度"><a href="#空间复杂度" class="headerlink" title="空间复杂度"></a>空间复杂度</h4><p>为一长段内存存储块<code>O(n)</code>。</p>
 <p>这个不画图了哈，很常见的存储结构（数组）。</p>
 <h3 id="二叉查找树"><a href="#二叉查找树" class="headerlink" title="二叉查找树"></a>二叉查找树</h3><p>左子树的键值小于根的键值，右子树的键值大于根的键值。</p>
-<p><img src="http://qd2x6jysb.bkt.clouddn.com/image-20200731141842208.png" alt="image-20200731141842208"></p>
+<p><img src="http://ali-md-pic.oss-cn-shenzhen.aliyuncs.com/md-pic-box/image-20200731141842208.png" alt="image-20200731141842208"></p>
 <h4 id="特点-1"><a href="#特点-1" class="headerlink" title="特点"></a>特点</h4><ul>
 <li><code>left &lt; root &lt; right</code>；</li>
 <li>标准二叉树；</li>
@@ -159,11 +159,11 @@
 <h4 id="缺点-1"><a href="#缺点-1" class="headerlink" title="缺点"></a>缺点</h4><ul>
 <li>某种情况下会线性；不平衡</li>
 </ul>
-<p><img src="http://qd2x6jysb.bkt.clouddn.com/image-20200731142004907.png" alt="image-20200731142004907"></p>
+<p><img src="http://ali-md-pic.oss-cn-shenzhen.aliyuncs.com/md-pic-box/image-20200731142004907.png" alt="image-20200731142004907"></p>
 <h4 id="时间复杂度-1"><a href="#时间复杂度-1" class="headerlink" title="时间复杂度"></a>时间复杂度</h4><p>规整二叉树的话，<code>O(log(n))</code>；</p>
 <p>极端情况下，<code>O(n)</code></p>
 <h3 id="平衡二叉树（AVL）"><a href="#平衡二叉树（AVL）" class="headerlink" title="平衡二叉树（AVL）"></a>平衡二叉树（AVL）</h3><p>平衡二叉树（AVL树）在符合二叉查找树的条件下，还满足任何节点的两个子树的高度最大差为1。</p>
-<p><img src="http://qd2x6jysb.bkt.clouddn.com/image-20200731142142051.png" alt="image-20200731142142051"></p>
+<p><img src="http://ali-md-pic.oss-cn-shenzhen.aliyuncs.com/md-pic-box/image-20200731142142051.png" alt="image-20200731142142051"></p>
 <h4 id="特点-2"><a href="#特点-2" class="headerlink" title="特点"></a>特点</h4><ul>
 <li>为了保证平衡（最短子树与最长子树差不超过1），会移动节点。</li>
 <li>满足二叉查找树。</li>
@@ -171,7 +171,7 @@
 <h4 id="缺点-2"><a href="#缺点-2" class="headerlink" title="缺点"></a>缺点</h4><ul>
 <li><p>插入/删除节点，会导致失衡，需要进一步进行节点调整等操作。</p>
 <p>这种失去平衡的二叉树可以概括为四种姿态：LL（左左）、RR（右右）、LR（左右）、RL（右左）：</p>
-<p><img src="http://qd2x6jysb.bkt.clouddn.com/image-20200731142628225.png" alt="image-20200731142628225"></p>
+<p><img src="http://ali-md-pic.oss-cn-shenzhen.aliyuncs.com/md-pic-box/image-20200731142628225.png" alt="image-20200731142628225"></p>
 </li>
 </ul>
 <p>来，一个一个分析，一个一个<strong>旋转</strong>：</p>
@@ -182,21 +182,21 @@
 <li>将新根节点的右孩子作为原根节点的左孩子。</li>
 <li>将原根节点作为新根节点的右孩子。</li>
 </ol>
-<p><img src="http://qd2x6jysb.bkt.clouddn.com/image-20200731142935616.png" alt="image-20200731142935616"></p>
+<p><img src="http://ali-md-pic.oss-cn-shenzhen.aliyuncs.com/md-pic-box/image-20200731142935616.png" alt="image-20200731142935616"></p>
 <h5 id="LR"><a href="#LR" class="headerlink" title="LR"></a>LR</h5><p>插入或删除一个节点后，根节点的左孩子（Left Child）的右孩子（Right Child）还有非空节点，导致根节点的左子树高度比右子树高度高2，AVL树失去平衡。</p>
 <p>旋转：</p>
 <ol>
 <li>围绕根节点的左孩子进行RR旋转。</li>
 <li>围绕根节点进行LL旋转。</li>
 </ol>
-<p><img src="http://qd2x6jysb.bkt.clouddn.com/image-20200731143052608.png" alt="image-20200731143052608"></p>
+<p><img src="http://ali-md-pic.oss-cn-shenzhen.aliyuncs.com/md-pic-box/image-20200731143052608.png" alt="image-20200731143052608"></p>
 <h5 id="RL"><a href="#RL" class="headerlink" title="RL"></a>RL</h5><p>插入或删除一个节点后，根节点的右孩子（Right Child）的左孩子（Left Child）还有非空节点，导致根节点的右子树高度比左子树高度高2，AVL树失去平衡。</p>
 <p>旋转：</p>
 <ol>
 <li>围绕根节点的右孩子进行LL旋转。</li>
 <li>围绕根节点进行RR旋转。</li>
 </ol>
-<p><img src="http://qd2x6jysb.bkt.clouddn.com/image-20200731143119445.png" alt="image-20200731143119445"></p>
+<p><img src="http://ali-md-pic.oss-cn-shenzhen.aliyuncs.com/md-pic-box/image-20200731143119445.png" alt="image-20200731143119445"></p>
 <h5 id="RR"><a href="#RR" class="headerlink" title="RR"></a>RR</h5><p>插入或删除一个节点后，根节点的右孩子（Right Child）的右孩子（Right Child）还有非空节点，导致根节点的右子树高度比左子树高度高2，AVL树失去平衡。</p>
 <p>旋转：</p>
 <ol>
@@ -204,7 +204,7 @@
 <li>将新根节点的左孩子作为原根节点的右孩子。</li>
 <li>将原根节点作为新根节点的左孩子。</li>
 </ol>
-<p><img src="http://qd2x6jysb.bkt.clouddn.com/image-20200731143022677.png" alt="image-20200731143022677"></p>
+<p><img src="http://ali-md-pic.oss-cn-shenzhen.aliyuncs.com/md-pic-box/image-20200731143022677.png" alt="image-20200731143022677"></p>
 <h4 id="时间复杂度-2"><a href="#时间复杂度-2" class="headerlink" title="时间复杂度"></a>时间复杂度</h4><p>最坏情况下为<code>O log(n)</code>。</p>
 <h3 id="红黑树（Red-Black-Tree）"><a href="#红黑树（Red-Black-Tree）" class="headerlink" title="红黑树（Red-Black Tree）"></a>红黑树（Red-Black Tree）</h3><blockquote>
 <p>参考：</p>
@@ -214,7 +214,7 @@
 </blockquote>
 <p>它近似二叉平衡树。</p>
 <p>比起<code>AVL</code>，红黑树在插入、删除等操作，<strong>不会像平衡树那样，频繁着破坏红黑树的规则，所以不需要频繁着调整</strong>。</p>
-<p><img src="http://qd2x6jysb.bkt.clouddn.com/image-20200804004125103.png" alt="image-20200804004125103"></p>
+<p><img src="http://ali-md-pic.oss-cn-shenzhen.aliyuncs.com/md-pic-box/image-20200804004125103.png" alt="image-20200804004125103"></p>
 <blockquote>
 <p>Java TreeMap实现了SortedMap接口，也就是说会按照key的大小顺序对Map中的元素进行排序，key大小的评判可以通过其本身的自然顺序（natural ordering），也可以通过构造时传入的比较器（Comparator）。TreeMap底层通过红黑树（Red-Black tree）实现，也就意味着containsKey(), get(), put(), remove()都有着log(n)的时间复杂度。</p>
 </blockquote>
@@ -271,7 +271,7 @@
 <li><p>若根节点不是叶子节点，则至少有2个孩子 ；</p>
 </li>
 </ul>
-<p><img src="http://qd2x6jysb.bkt.clouddn.com/image-20200731143515516.png" alt="image-20200731143515516"></p>
+<p><img src="http://ali-md-pic.oss-cn-shenzhen.aliyuncs.com/md-pic-box/image-20200731143515516.png" alt="image-20200731143515516"></p>
 <p>按上图模拟查找关键字29的过程：</p>
 <ol>
 <li>根据根节点找到磁盘块1，读入内存。【磁盘I/O操作第1次】</li>
@@ -295,7 +295,7 @@
 <li>所有叶子节点之间都有一个链指针（双向链表）。</li>
 <li>数据记录都存放在叶子节点中。</li>
 </ol>
-<p><img src="http://qd2x6jysb.bkt.clouddn.com/image-20200731144239056.png" alt="image-20200731144239056"></p>
+<p><img src="http://ali-md-pic.oss-cn-shenzhen.aliyuncs.com/md-pic-box/image-20200731144239056.png" alt="image-20200731144239056"></p>
 <h4 id="特点-5"><a href="#特点-5" class="headerlink" title="特点"></a>特点</h4><ul>
 <li><p>范围查找，定位<code>min</code>与<code>max</code>之后，中间叶子节点，就是结果集，不用中序回溯；</p>
 </li>

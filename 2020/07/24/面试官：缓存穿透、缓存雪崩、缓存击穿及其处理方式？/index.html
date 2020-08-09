@@ -121,7 +121,7 @@
         <blockquote>
 <p>参考：<a href="https://mp.weixin.qq.com/s/3Fmv7h5p2QDtLxc9n1dp5A" target="_blank" rel="noopener">https://mp.weixin.qq.com/s/3Fmv7h5p2QDtLxc9n1dp5A</a></p>
 </blockquote>
-<h4 id="缓存穿透"><a href="#缓存穿透" class="headerlink" title="缓存穿透"></a>缓存穿透</h4><p><img src="http://qd2x6jysb.bkt.clouddn.com/image-20200709232449867.png" alt="image-20200709232449867"></p>
+<h4 id="缓存穿透"><a href="#缓存穿透" class="headerlink" title="缓存穿透"></a>缓存穿透</h4><p><img src="http://ali-md-pic.oss-cn-shenzhen.aliyuncs.com/md-pic-box/image-20200709232449867.png" alt="image-20200709232449867"></p>
 <p>缓存穿透，即黑客故意去请求缓存中不存在的数据，导致所有的请求都怼到数据库上，从而数据库连接异常。</p>
 <p><strong>解决方案</strong>：</p>
 <ul>
@@ -130,8 +130,9 @@
 <li><strong>缓存空对象</strong>；</li>
 <li>提供一个能迅速判断请求是否有效的<strong>拦截机制</strong>，比如，利用<strong>布隆过滤器</strong>，内部维护一系列合法有效的key。迅速判断出，请求所携带的Key是否合法有效。如果不合法，则直接返回。</li>
 </ul>
-<h4 id="缓存雪崩"><a href="#缓存雪崩" class="headerlink" title="缓存雪崩"></a>缓存雪崩</h4><p><img src="http://qd2x6jysb.bkt.clouddn.com/image-20200709232428621.png" alt="image-20200709232428621"></p>
-<pre><code>缓存雪崩是指，缓存层出现了错误，不能正常工作了。于是所有的请求都会达到存储层，存储层的调用量会暴增，造成存储层也会挂掉的情况。</code></pre><p><strong>解决方案</strong>：</p>
+<h4 id="缓存雪崩"><a href="#缓存雪崩" class="headerlink" title="缓存雪崩"></a>缓存雪崩</h4><p><img src="http://ali-md-pic.oss-cn-shenzhen.aliyuncs.com/md-pic-box/image-20200709232428621.png" alt="image-20200709232428621"></p>
+<p>缓存雪崩是指，缓存层出现了错误，不能正常工作了。于是所有的请求都会达到存储层，存储层的调用量会暴增，造成存储层也会挂掉的情况。</p>
+<p><strong>解决方案</strong>：</p>
 <ul>
 <li><strong>给缓存的失效时间</strong><br>加上一个随机值，避免集体失效。</li>
 <li><strong>使用互斥锁</strong><br>但是该方案吞吐量明显下降了。</li>

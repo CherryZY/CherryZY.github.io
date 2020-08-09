@@ -170,10 +170,10 @@
 <h6 id="二、如果删缓存失败了怎么办，那不是会有不一致的情况出现么？"><a href="#二、如果删缓存失败了怎么办，那不是会有不一致的情况出现么？" class="headerlink" title="二、如果删缓存失败了怎么办，那不是会有不一致的情况出现么？"></a>二、如果删缓存失败了怎么办，那不是会有不一致的情况出现么？</h6><p>比如一个写数据请求，然后写入数据库了，删缓存失败了，这会就出现不一致的情况了。</p>
 <p>解决方案：</p>
 <p><strong>1）侵入代码的重试机制</strong>  </p>
-<p><img src="http://qd2x6jysb.bkt.clouddn.com/image-20200709143640239.png" alt="image-20200709143640239"></p>
+<p><img src="http://ali-md-pic.oss-cn-shenzhen.aliyuncs.com/md-pic-box/image-20200709143640239.png" alt="image-20200709143640239"></p>
 <p><strong>缺点</strong>：侵入太多业务代码。</p>
 <p><strong>2）监听binlog的异步重试机制</strong></p>
-<p><img src="http://qd2x6jysb.bkt.clouddn.com/image-20200709143722834.png" alt="image-20200709143722834"></p>
+<p><img src="http://ali-md-pic.oss-cn-shenzhen.aliyuncs.com/md-pic-box/image-20200709143722834.png" alt="image-20200709143722834"></p>
 <p>① 更新数据库数据；</p>
 <p>② 数据库会将操作信息写入<code>binlog日志</code>当中；</p>
 <p>③ 订阅程序提取出所需要的<code>数据以及key</code>；</p>

@@ -118,17 +118,17 @@
           
       </div>
       <div class="markdown-body">
-        <h2 id="GC时如何对对象进行标记？"><a href="#GC时如何对对象进行标记？" class="headerlink" title="GC时如何对对象进行标记？"></a>GC时如何对对象进行标记？</h2><h3 id="三色标记"><a href="#三色标记" class="headerlink" title="三色标记"></a>三色标记</h3><p><img src="http://qd2x6jysb.bkt.clouddn.com/image-20200803190002786.png" alt="image-20200803190002786"></p>
+        <h2 id="GC时如何对对象进行标记？"><a href="#GC时如何对对象进行标记？" class="headerlink" title="GC时如何对对象进行标记？"></a>GC时如何对对象进行标记？</h2><h3 id="三色标记"><a href="#三色标记" class="headerlink" title="三色标记"></a>三色标记</h3><p><img src="http://ali-md-pic.oss-cn-shenzhen.aliyuncs.com/md-pic-box/image-20200803190002786.png" alt="image-20200803190002786"></p>
 <ul>
 <li><strong>白色</strong>：尚未访问过。</li>
 <li><strong>黑色</strong>：本对象已访问过，而且本对象 引用到 的其他对象 也全部访问过了。</li>
 <li><strong>灰色</strong>：本对象已访问过，但是本对象 引用到 的其他对象 尚未全部访问完。全部访问后，会转换为黑色。</li>
 </ul>
 <h2 id="漏标及其处理方式？"><a href="#漏标及其处理方式？" class="headerlink" title="漏标及其处理方式？"></a>漏标及其处理方式？</h2><p>漏标：</p>
-<p><img src="http://qd2x6jysb.bkt.clouddn.com/image-20200730112316708.png" alt="image-20200730112316708"></p>
-<h3 id="CMS（解决方案：Incremental-Update）"><a href="#CMS（解决方案：Incremental-Update）" class="headerlink" title="CMS（解决方案：Incremental Update）"></a>CMS（解决方案：Incremental Update）</h3><p><img src="http://qd2x6jysb.bkt.clouddn.com/image-20200730113841152.png" alt="image-20200730113841152"></p>
+<p><img src="http://ali-md-pic.oss-cn-shenzhen.aliyuncs.com/md-pic-box/image-20200730112316708.png" alt="image-20200730112316708"></p>
+<h3 id="CMS（解决方案：Incremental-Update）"><a href="#CMS（解决方案：Incremental-Update）" class="headerlink" title="CMS（解决方案：Incremental Update）"></a>CMS（解决方案：Incremental Update）</h3><p><img src="http://ali-md-pic.oss-cn-shenzhen.aliyuncs.com/md-pic-box/image-20200730113841152.png" alt="image-20200730113841152"></p>
 <p>假设<code>B-&gt;D</code>消失，A指向D，则在下次标记（重新标记 <code>Remark</code>）时，从<code>A</code>重新标记，<code>D</code>没有被标记，则使<code>A</code>标记为<strong>灰色</strong>即可。</p>
-<h4 id="问题"><a href="#问题" class="headerlink" title="问题"></a>问题</h4><p><img src="http://qd2x6jysb.bkt.clouddn.com/image-20200730111107874.png" alt="image-20200730111107874"></p>
+<h4 id="问题"><a href="#问题" class="headerlink" title="问题"></a>问题</h4><p><img src="http://ali-md-pic.oss-cn-shenzhen.aliyuncs.com/md-pic-box/image-20200730111107874.png" alt="image-20200730111107874"></p>
 <h3 id="G1（解决方案：SATB-Snapshot-At-The-Begin）"><a href="#G1（解决方案：SATB-Snapshot-At-The-Begin）" class="headerlink" title="G1（解决方案：SATB -  Snapshot At The Begin）"></a>G1（解决方案：SATB -  Snapshot At The Begin）</h3><p>在起始的时候做一个快照，当<code>B-&gt;D</code>消失，则把这个引用推到<code>GC</code>的堆栈中，保证<code>D</code>还能被<code>GC</code>扫描到。</p>
 <p>配合<code>RSet</code>，只用扫描哪些<code>Region</code>引用到<code>D</code>这个<code>Region</code>了。</p>
 

@@ -138,9 +138,9 @@
 <p><strong>主要作用：</strong></p>
 <p>用来存放在锁上阻塞的线程，当一个线程尝试获取锁时，如果已经被占用，那么当前线程就会被构造成一个<code>Node节点</code>加入到同步队列的尾部，队列的头节点是成功获取锁的节点，当头节点线程释放锁时，会唤醒后面的节点并释放当前头节点的引用。</p>
 <p><strong>主要属性：</strong></p>
-<img src="http://qd2x6jysb.bkt.clouddn.com/image-20200712200326867.png?ynotemdtimestamp=1593654556079" alt="image-20200712200326867" style="zoom: 33%;" />
+<img src="http://ali-md-pic.oss-cn-shenzhen.aliyuncs.com/md-pic-box/image-20200712200326867.png?ynotemdtimestamp=1593654556079" alt="image-20200712200326867" style="zoom: 33%;" />
 
-<h5 id="State"><a href="#State" class="headerlink" title="State"></a><strong>State</strong></h5><img src="http://qd2x6jysb.bkt.clouddn.com/image-20200712200119989.png" alt="image-20200712200119989" style="zoom:50%;" />
+<h5 id="State"><a href="#State" class="headerlink" title="State"></a><strong>State</strong></h5><img src="http://ali-md-pic.oss-cn-shenzhen.aliyuncs.com/md-pic-box/image-20200712200119989.png" alt="image-20200712200119989" style="zoom:50%;" />
 
 <p>用来标识当前锁状态：</p>
 <ul>
@@ -154,8 +154,8 @@
 
 <figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">private</span> Node <span class="title">addWaiter</span><span class="params">(Node mode)</span> </span>&#123;</span><br><span class="line">       Node node = <span class="keyword">new</span> Node(Thread.currentThread(), mode);</span><br><span class="line">       <span class="comment">// 使用enq的快捷方法，如果CAS操作失败，才会去执行enq </span></span><br><span class="line">       Node pred = tail;</span><br><span class="line">       <span class="comment">// 如果队列不为空</span></span><br><span class="line">       <span class="keyword">if</span> (pred != <span class="keyword">null</span>) &#123;</span><br><span class="line">           node.prev = pred;</span><br><span class="line">           <span class="keyword">if</span> (compareAndSetTail(pred, node)) &#123;</span><br><span class="line">               pred.next = node;</span><br><span class="line">               <span class="keyword">return</span> node;</span><br><span class="line">           &#125;</span><br><span class="line">       &#125;</span><br><span class="line">       <span class="comment">// 执行到这里，有两种情况：</span></span><br><span class="line">       <span class="comment">// 1.队列为空。head和tail成员从来没有初始化过</span></span><br><span class="line">       <span class="comment">// 2.CAS操作失败。当执行compareAndSetTail时，tail成员已经被修改了</span></span><br><span class="line">       enq(node);</span><br><span class="line">       <span class="keyword">return</span> node;</span><br><span class="line">   &#125;</span><br></pre></td></tr></table></figure>
 
-<p><img src="http://qd2x6jysb.bkt.clouddn.com/image-20200712202502157.png?ynotemdtimestamp=1593654556079" alt="image-20200712202502157"></p>
-<h6 id="1、首先执行tryAcquire进行尝试获取锁；"><a href="#1、首先执行tryAcquire进行尝试获取锁；" class="headerlink" title="1、首先执行tryAcquire进行尝试获取锁；"></a>1、首先执行<code>tryAcquire</code>进行尝试获取锁；</h6><h6 id="2、第1步失败，addWaiter将当前线程节点（Node-EXCLUSIVE）放入链表尾部，并返回Node；"><a href="#2、第1步失败，addWaiter将当前线程节点（Node-EXCLUSIVE）放入链表尾部，并返回Node；" class="headerlink" title="2、第1步失败，addWaiter将当前线程节点（Node.EXCLUSIVE）放入链表尾部，并返回Node；"></a>2、第1步失败，<code>addWaiter</code>将当前线程节点（<code>Node.EXCLUSIVE</code>）放入链表尾部，并返回<code>Node</code>；</h6><img src="http://qd2x6jysb.bkt.clouddn.com/image-20200712202634349.png" alt="image-20200712202634349" style="zoom:50%;" />
+<p><img src="http://ali-md-pic.oss-cn-shenzhen.aliyuncs.com/md-pic-box/image-20200712202502157.png?ynotemdtimestamp=1593654556079" alt="image-20200712202502157"></p>
+<h6 id="1、首先执行tryAcquire进行尝试获取锁；"><a href="#1、首先执行tryAcquire进行尝试获取锁；" class="headerlink" title="1、首先执行tryAcquire进行尝试获取锁；"></a>1、首先执行<code>tryAcquire</code>进行尝试获取锁；</h6><h6 id="2、第1步失败，addWaiter将当前线程节点（Node-EXCLUSIVE）放入链表尾部，并返回Node；"><a href="#2、第1步失败，addWaiter将当前线程节点（Node-EXCLUSIVE）放入链表尾部，并返回Node；" class="headerlink" title="2、第1步失败，addWaiter将当前线程节点（Node.EXCLUSIVE）放入链表尾部，并返回Node；"></a>2、第1步失败，<code>addWaiter</code>将当前线程节点（<code>Node.EXCLUSIVE</code>）放入链表尾部，并返回<code>Node</code>；</h6><img src="http://ali-md-pic.oss-cn-shenzhen.aliyuncs.com/md-pic-box/image-20200712202634349.png" alt="image-20200712202634349" style="zoom:50%;" />
 
 <p><strong>addWaiter</strong>步骤：</p>
 <ol>
@@ -209,7 +209,7 @@
 <p>或者说，每次执行<code>shouldParkAfterFailedAcquire</code>，都说明当前循环 尝试过获取锁了，但失败了。</p>
 <p>如果刚开始前驱的状态为0，那么需要第一次执行<code>compareAndSetWaitStatus(pred, ws, Node.SIGNAL)</code>返回false并进入下一次循环，第二次才能进入<code>if (ws == Node.SIGNAL)</code>分支，所以说 至少执行两次。<br>死循环保证了最终一定能设置前驱为<code>SIGNAL</code>成功的。（考虑当前线程一直不能获取到锁）</p>
 <p><strong><code>shouldParkAfterFailedAcquire</code>执行流程：</strong></p>
-<p><img src="http://qd2x6jysb.bkt.clouddn.com/image-20200719165934505.png" alt="image-20200719165934505"></p>
+<p><img src="http://ali-md-pic.oss-cn-shenzhen.aliyuncs.com/md-pic-box/image-20200719165934505.png" alt="image-20200719165934505"></p>
 <p><strong><code>node</code>一共有四种状态，但在独占锁的获取和释放过程中，我们只可能将<code>node</code>的状态变成<code>CANCELLED</code>或<code>SIGNAL</code>，而<code>shouldParkAfterFailedAcquire</code>函数就会把一个node的状态变成<code>SIGNAL</code>。</strong></p>
 <p><strong>注意，一个node新建的时候，它的<code>waitStatus</code>是默认初始化为0的。</strong></p>
 <ul>
@@ -219,7 +219,7 @@
 <p>==<strong><code>CANCELLED</code>状态与当前node关联，<code>SIGNAL</code>状态与后继node关联。</strong>==</p>
 <h6 id="为什么要有哨兵节点？"><a href="#为什么要有哨兵节点？" class="headerlink" title="为什么要有哨兵节点？"></a>为什么要有哨兵节点？</h6><p>解决边界问题，如果没有边界，指定环节，按照同样算法可能会在边界处发生异常。</p>
 <h6 id="4、第二步中acquireQueued返回中断状态为true，则Thread-currentThread-interrupt"><a href="#4、第二步中acquireQueued返回中断状态为true，则Thread-currentThread-interrupt" class="headerlink" title="4、第二步中acquireQueued返回中断状态为true，则Thread.currentThread().interrupt();"></a>4、第二步中<code>acquireQueued</code>返回中断状态为true，则<code>Thread.currentThread().interrupt()</code>;</h6><p>整体流程：</p>
-<p><img src="http://qd2x6jysb.bkt.clouddn.com/image-20200719160110977.png" alt="image-20200719160110977"></p>
+<p><img src="http://ali-md-pic.oss-cn-shenzhen.aliyuncs.com/md-pic-box/image-20200719160110977.png" alt="image-20200719160110977"></p>
 <ol>
 <li>首先<code>tryAqurie</code>获取锁；</li>
 <li>获取锁失败，则准备将当前线程Node添加到队列末端；（<code>CAS</code>）</li>
@@ -248,13 +248,13 @@
 <li><p>根据当前节点状态，需要考虑以下情况：</p>
 <ul>
 <li><p>当前节点是尾节点：</p>
-<p><img src="http://qd2x6jysb.bkt.clouddn.com/image-20200719233115203.png" alt="image-20200719233115203"></p>
+<p><img src="http://ali-md-pic.oss-cn-shenzhen.aliyuncs.com/md-pic-box/image-20200719233115203.png" alt="image-20200719233115203"></p>
 </li>
 <li><p>当前节点是Head的后继节点：</p>
-<p><img src="http://qd2x6jysb.bkt.clouddn.com/image-20200719233131979.png" alt="image-20200719233131979"></p>
+<p><img src="http://ali-md-pic.oss-cn-shenzhen.aliyuncs.com/md-pic-box/image-20200719233131979.png" alt="image-20200719233131979"></p>
 </li>
 <li><p>当前节点不是Head的后继节点，也不是尾节点：</p>
-<p><img src="http://qd2x6jysb.bkt.clouddn.com/image-20200719233201578.png" alt="image-20200719233201578"></p>
+<p><img src="http://ali-md-pic.oss-cn-shenzhen.aliyuncs.com/md-pic-box/image-20200719233201578.png" alt="image-20200719233201578"></p>
 </li>
 </ul>
 </li>
@@ -270,7 +270,7 @@
 <p>消除state值，解除<code>exclusiveOwnerThread</code>，<code>LockSupport.unpark()</code>解除当前线程挂起。</p>
 <p>子类<code>tryRelease</code>成功后，开始执行<code>AQS.unparkSuccessor()</code>方法，唤醒头节点的后继节点，若为<code>CANCEL</code>，则从尾部到头部进行查找。</p>
 <p><strong>流程图</strong>：</p>
-<p><img src="http://qd2x6jysb.bkt.clouddn.com/image-20200720005147869.png" alt="image-20200720005147869"></p>
+<p><img src="http://ali-md-pic.oss-cn-shenzhen.aliyuncs.com/md-pic-box/image-20200720005147869.png" alt="image-20200720005147869"></p>
 <h6 id="为什么从尾部往前查找？"><a href="#为什么从尾部往前查找？" class="headerlink" title="为什么从尾部往前查找？"></a>为什么从尾部往前查找？</h6><p>1、节点入队并不是原子操作：</p>
 <figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">node.prev = pred; </span><br><span class="line">compareAndSetTail(pred, node)</span><br></pre></td></tr></table></figure>
 
@@ -356,19 +356,19 @@
 <li>不管哪种情况，被唤醒后，都会<strong>检查中断状态</strong>，每个循环都会检查一次。</li>
 </ul>
 <p><strong>流程图：</strong></p>
-<p><img src="http://qd2x6jysb.bkt.clouddn.com/image-20200720012138548.png" alt="image-20200720012138548"></p>
-<h4 id="Condition"><a href="#Condition" class="headerlink" title="Condition"></a><code>Condition</code></h4><h5 id="await-加入条件等待队列"><a href="#await-加入条件等待队列" class="headerlink" title="await() 加入条件等待队列"></a><code>await()</code> 加入条件等待队列</h5><p><img src="http://qd2x6jysb.bkt.clouddn.com/image-20200713171739210.png" alt="image-20200713171739210"></p>
-<p><img src="http://qd2x6jysb.bkt.clouddn.com/image-20200713171758319.png" alt="image-20200713171758319"></p>
+<p><img src="http://ali-md-pic.oss-cn-shenzhen.aliyuncs.com/md-pic-box/image-20200720012138548.png" alt="image-20200720012138548"></p>
+<h4 id="Condition"><a href="#Condition" class="headerlink" title="Condition"></a><code>Condition</code></h4><h5 id="await-加入条件等待队列"><a href="#await-加入条件等待队列" class="headerlink" title="await() 加入条件等待队列"></a><code>await()</code> 加入条件等待队列</h5><p><img src="http://ali-md-pic.oss-cn-shenzhen.aliyuncs.com/md-pic-box/image-20200713171739210.png" alt="image-20200713171739210"></p>
+<p><img src="http://ali-md-pic.oss-cn-shenzhen.aliyuncs.com/md-pic-box/image-20200713171758319.png" alt="image-20200713171758319"></p>
 <p>1、新增<code>ConditionWaiter</code>节点，并放到队列尾部；</p>
 <p>2、<code>fullyRelease</code>释放当前锁状态为0；</p>
 <p>3、阻塞（<code>unsafe.park</code>挂起）直到发信号或被打断。</p>
-<h5 id="signal-加入AQS等待队列"><a href="#signal-加入AQS等待队列" class="headerlink" title="signal() 加入AQS等待队列"></a><code>signal()</code> 加入<code>AQS</code>等待队列</h5><p>|<img src="http://qd2x6jysb.bkt.clouddn.com/image-20200713171930535.png" alt="image-20200713171930535">|<img src="http://qd2x6jysb.bkt.clouddn.com/image-20200713172059912.png" alt="image-20200713172059912" style="zoom:95%;" /></p>
-<p><img src="http://qd2x6jysb.bkt.clouddn.com/image-20200713172421534.png" alt="image-20200713172421534"></p>
+<h5 id="signal-加入AQS等待队列"><a href="#signal-加入AQS等待队列" class="headerlink" title="signal() 加入AQS等待队列"></a><code>signal()</code> 加入<code>AQS</code>等待队列</h5><p>|<img src="http://ali-md-pic.oss-cn-shenzhen.aliyuncs.com/md-pic-box/image-20200713171930535.png" alt="image-20200713171930535">|<img src="http://ali-md-pic.oss-cn-shenzhen.aliyuncs.com/md-pic-box/image-20200713172059912.png" alt="image-20200713172059912" style="zoom:95%;" /></p>
+<p><img src="http://ali-md-pic.oss-cn-shenzhen.aliyuncs.com/md-pic-box/image-20200713172421534.png" alt="image-20200713172421534"></p>
 <p>删除并转移节点，直到命中状态为不可取消或为null。 从信号中分离出来，部分鼓励编译器内联没有waiter节点的情况。</p>
 <p>1、（<code>signal</code>）判断当前线程是否被持有（<code>exclusiveOwnerThread</code>）；</p>
 <p>2、（<code>doSignal</code>）从头结点开始遍历，将当前节点的<code>Node.waitStates</code>修改为0，失败则返回false，继续循环取下一个节点。将当前节点<code>enq</code>到<code>AQS</code>同步队列。</p>
 <p>判断当前节点前驱节点的<code>waitStates</code>，假如为CANCEL，或者将当前节点<code>waitStates</code>用CAS变为<code>Node.SIGNAL</code>（正在等待）失败，<br>则唤醒当前线程。（这里就是将<code>waitStates</code>的值0，<code>CAS</code>为-1）</p>
-<h5 id="signal-加入AQS等待队列-1"><a href="#signal-加入AQS等待队列-1" class="headerlink" title="signal()  加入AQS等待队列"></a><code>signal()</code>  加入<code>AQS</code>等待队列</h5><p><img src="http://qd2x6jysb.bkt.clouddn.com/image-20200713171906787.png" alt="image-20200713171906787"></p>
+<h5 id="signal-加入AQS等待队列-1"><a href="#signal-加入AQS等待队列-1" class="headerlink" title="signal()  加入AQS等待队列"></a><code>signal()</code>  加入<code>AQS</code>等待队列</h5><p><img src="http://ali-md-pic.oss-cn-shenzhen.aliyuncs.com/md-pic-box/image-20200713171906787.png" alt="image-20200713171906787"></p>
 <p>删除并转移所有节点。（唤醒，并让所有任务重新入队）</p>
 <h3 id="ReentrantLock"><a href="#ReentrantLock" class="headerlink" title="ReentrantLock"></a><code>ReentrantLock</code></h3><p><strong>Sync</strong>为<code>ReentrantLock</code>里面的一个内部类，它继承<code>AQS</code>（<code>AbstractQueuedSynchronizer</code>），它有两个子类：<code>公平锁FairSync</code>和<code>非公平锁NonfairSync</code>。</p>
 <h4 id="非公平锁加锁（默认）"><a href="#非公平锁加锁（默认）" class="headerlink" title="非公平锁加锁（默认）"></a>非公平锁加锁（默认）</h4><figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// ReentrantLock 类中</span></span><br><span class="line"><span class="function"><span class="keyword">final</span> <span class="keyword">void</span> <span class="title">lock</span><span class="params">()</span> </span>&#123;</span><br><span class="line">       <span class="comment">//尝试获取锁</span></span><br><span class="line">       <span class="keyword">if</span> (compareAndSetState(<span class="number">0</span>, <span class="number">1</span>))</span><br><span class="line">           setExclusiveOwnerThread(Thread.currentThread());</span><br><span class="line">       <span class="keyword">else</span></span><br><span class="line">           <span class="comment">//获取失败，调用AQS的acquire(int arg)方法</span></span><br><span class="line">           acquire(<span class="number">1</span>);</span><br><span class="line">   &#125;</span><br><span class="line"></span><br><span class="line"><span class="comment">// AbstractQueueSynchronizer类中</span></span><br><span class="line"><span class="function"><span class="keyword">public</span> <span class="keyword">final</span> <span class="keyword">void</span> <span class="title">acquire</span><span class="params">(<span class="keyword">int</span> arg)</span> </span>&#123;</span><br><span class="line">       <span class="keyword">if</span> (!tryAcquire(arg) &amp;&amp;</span><br><span class="line">               acquireQueued(addWaiter(Node.EXCLUSIVE), arg))</span><br><span class="line">           selfInterrupt();</span><br><span class="line">   &#125;</span><br></pre></td></tr></table></figure>
@@ -390,8 +390,8 @@
 <p>AQS源码获取锁依赖<code>Unsafe</code>，而<code>Unsafe</code>内部方法依赖<code>CAS</code>：</p>
 <figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br></pre></td><td class="code"><pre><span class="line">AbstractQueuedSynchronizer</span><br><span class="line">		<span class="comment">/**</span></span><br><span class="line"><span class="comment">     * Atomically sets synchronization state to the given updated</span></span><br><span class="line"><span class="comment">     * value if the current state value equals the expected value.</span></span><br><span class="line"><span class="comment">     * This operation has memory semantics of a &#123;<span class="doctag">@code</span> volatile&#125; read</span></span><br><span class="line"><span class="comment">     * and write.</span></span><br><span class="line"><span class="comment">     *</span></span><br><span class="line"><span class="comment">     * <span class="doctag">@param</span> expect the expected value</span></span><br><span class="line"><span class="comment">     * <span class="doctag">@param</span> update the new value</span></span><br><span class="line"><span class="comment">     * <span class="doctag">@return</span> &#123;<span class="doctag">@code</span> true&#125; if successful. False return indicates that the actual</span></span><br><span class="line"><span class="comment">     *         value was not equal to the expected value.</span></span><br><span class="line"><span class="comment">     */</span></span><br><span class="line">    <span class="function"><span class="keyword">protected</span> <span class="keyword">final</span> <span class="keyword">boolean</span> <span class="title">compareAndSetState</span><span class="params">(<span class="keyword">int</span> expect, <span class="keyword">int</span> update)</span> </span>&#123;</span><br><span class="line">        <span class="comment">// See below for intrinsics setup to support this</span></span><br><span class="line">        <span class="keyword">return</span> unsafe.compareAndSwapInt(<span class="keyword">this</span>, stateOffset, expect, update);</span><br><span class="line">    &#125;</span><br></pre></td></tr></table></figure>
 
-<p><img src="http://qd2x6jysb.bkt.clouddn.com/image-20200720023019239.png" alt="image-20200720023019239"></p>
-<p><img src="http://qd2x6jysb.bkt.clouddn.com/image-20200720023036720.png" alt="image-20200720023036720"></p>
+<p><img src="http://ali-md-pic.oss-cn-shenzhen.aliyuncs.com/md-pic-box/image-20200720023019239.png" alt="image-20200720023019239"></p>
+<p><img src="http://ali-md-pic.oss-cn-shenzhen.aliyuncs.com/md-pic-box/image-20200720023036720.png" alt="image-20200720023036720"></p>
 <p><strong><code>os::is_MP</code></strong>判断当前系统是否为多核系统，如果是就给总线加锁，所以同一芯片上的其他处理器就暂时不能通过总线访问内存，保证了该指令在多处理器环境下的原子性。</p>
 <h5 id="缺陷"><a href="#缺陷" class="headerlink" title="缺陷"></a>缺陷</h5><ul>
 <li><h6 id="ABA问题"><a href="#ABA问题" class="headerlink" title="ABA问题"></a><strong>ABA问题</strong></h6><p>解决方式：</p>
@@ -449,7 +449,7 @@
 <p>定义：定义一个操作中的算法骨架，而将一些步骤的实现延迟到子类中。</p>
 <p>模版方法可以使得子类可以不改变一个算法的结构既可重定义该算法的某些步骤。</p>
 <p>其中的模版方法：</p>
-<p><img src="http://qd2x6jysb.bkt.clouddn.com/image-20200727015613400.png" alt="image-20200727015613400"></p>
+<p><img src="http://ali-md-pic.oss-cn-shenzhen.aliyuncs.com/md-pic-box/image-20200727015613400.png" alt="image-20200727015613400"></p>
 <blockquote>
 <p>参考：</p>
 <p><a href="https://mp.weixin.qq.com/s/wIeRxal0gBE4uYY7Nk817g" target="_blank" rel="noopener">https://mp.weixin.qq.com/s/wIeRxal0gBE4uYY7Nk817g</a></p>
